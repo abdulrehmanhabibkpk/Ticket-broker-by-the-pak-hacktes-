@@ -1,0 +1,6 @@
+{
+  "name": "B2B Ticket Booking Portal",
+  "description": "An enterprise-grade B2B ticket booking portal synchronizing in real-time with an Android mobile counterpart, utilizing Firestore and Firebase Authentication.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
