@@ -38,12 +38,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   // Form State for Adding / Editing Tickets
   const [isEditing, setIsEditing] = useState(false);
   const [editTicketId, setEditTicketId] = useState<string | null>(null);
-  const [route, setRoute] = useState("");
-  const [dateTime, setDateTime] = useState("");
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [departureDate, setDepartureDate] = useState("");
   const [price, setPrice] = useState<number>(0);
   const [totalSeats, setTotalSeats] = useState<number>(0);
   const [availableSeats, setAvailableSeats] = useState<number>(0);
-  const [carrier, setCarrier] = useState("");
+  const [airline, setAirline] = useState("");
+  const [pnrPrefix, setPnrPrefix] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
@@ -66,14 +68,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           const data = docSnap.data();
           ticketList.push({
             id: docSnap.id,
-            title: data.title || data.route || "No Route Name",
-            route: data.route || data.title || "No Route Name",
-            dateTime: data.dateTime || "",
+            origin: data.origin || "",
+            destination: data.destination || "",
+            departureDate: data.departureDate || "",
             price: Number(data.price) || 0,
             availableSeats: Number(data.availableSeats) !== undefined ? Number(data.availableSeats) : (Number(data.totalSeats) || 0),
             totalSeats: Number(data.totalSeats) || 0,
-            carrier: data.carrier || data.airline || "Unknown Carrier",
-            airline: data.airline || data.carrier || "Unknown Carrier",
+            airline: data.airline || "",
+            pnrPrefix: data.pnrPrefix || "",
           });
         });
         setTickets(ticketList);
@@ -126,13 +128,13 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setFormSuccess("");
     setSubmitting(true);
 
-    if (!route.trim()) {
-      setFormError("Route/Route Title is required.");
+    if (!origin.trim() || !destination.trim()) {
+      setFormError("Origin and Destination are required.");
       setSubmitting(false);
       return;
     }
-    if (!carrier.trim()) {
-      setFormError("Airline Carrier is required.");
+    if (!airline.trim() || !pnrPrefix.trim()) {
+      setFormError("Airline and PNR Prefix are required.");
       setSubmitting(false);
       return;
     }
@@ -144,14 +146,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
     try {
       const ticketData = {
-        title: route,
-        route: route,
-        dateTime: dateTime,
+        origin,
+        destination,
+        departureDate,
         price: Number(price),
         totalSeats: Number(totalSeats),
         availableSeats: isEditing ? Number(availableSeats) : Number(totalSeats),
-        carrier: carrier,
-        airline: carrier,
+        airline,
+        pnrPrefix,
       };
 
       if (isEditing && editTicketId) {
@@ -177,12 +179,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const handleEditClick = (ticket: Ticket) => {
     setIsEditing(true);
     setEditTicketId(ticket.id);
-    setRoute(ticket.route);
-    setDateTime(ticket.dateTime);
+    setOrigin(ticket.origin);
+    setDestination(ticket.destination);
+    setDepartureDate(ticket.departureDate);
     setPrice(ticket.price);
     setTotalSeats(ticket.totalSeats);
     setAvailableSeats(ticket.availableSeats);
-    setCarrier(ticket.carrier);
+    setAirline(ticket.airline);
+    setPnrPrefix(ticket.pnrPrefix);
   };
 
   const handleDeleteTicket = async (ticketId: string) => {
@@ -209,12 +213,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const resetForm = () => {
     setIsEditing(false);
     setEditTicketId(null);
-    setRoute("");
-    setDateTime("");
+    setOrigin("");
+    setDestination("");
+    setDepartureDate("");
     setPrice(0);
     setTotalSeats(0);
     setAvailableSeats(0);
-    setCarrier("");
+    setAirline("");
+    setPnrPrefix("");
   };
 
   return (
@@ -286,29 +292,47 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
               <form onSubmit={handleCreateOrUpdateTicket} className="space-y-4">
                 <Input
-                  id="form-route-input"
-                  label="Flight Route"
-                  placeholder="e.g., London to New York"
-                  value={route}
-                  onChange={(e) => setRoute(e.target.value)}
+                  id="form-origin-input"
+                  label="Origin"
+                  placeholder="e.g., London"
+                  value={origin}
+                  onChange={(e) => setOrigin(e.target.value)}
+                  required
+                />
+                
+                <Input
+                  id="form-destination-input"
+                  label="Destination"
+                  placeholder="e.g., New York"
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
                   required
                 />
 
                 <Input
-                  id="form-carrier-input"
-                  label="Airline / Carrier"
+                  id="form-airline-input"
+                  label="Airline"
                   placeholder="e.g., British Airways"
-                  value={carrier}
-                  onChange={(e) => setCarrier(e.target.value)}
+                  value={airline}
+                  onChange={(e) => setAirline(e.target.value)}
                   required
                 />
 
                 <Input
-                  id="form-datetime-input"
-                  label="Departure Date & Time"
-                  type="datetime-local"
-                  value={dateTime}
-                  onChange={(e) => setDateTime(e.target.value)}
+                  id="form-pnr-prefix-input"
+                  label="PNR Prefix"
+                  placeholder="e.g., BA"
+                  value={pnrPrefix}
+                  onChange={(e) => setPnrPrefix(e.target.value)}
+                  required
+                />
+
+                <Input
+                  id="form-date-input"
+                  label="Departure Date"
+                  type="date"
+                  value={departureDate}
+                  onChange={(e) => setDepartureDate(e.target.value)}
                   required
                 />
 
@@ -394,27 +418,28 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-[#E5E7EB]">
-                    <thead>
+                      <thead>
                       <tr className="bg-gray-50">
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Carrier</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Route</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Departure</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Airline / PNR</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Origin &rarr; Dest</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Departure Date</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Price</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Capacity</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Seats</th>
                         <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E5E7EB] bg-white">
                       {tickets.map((t) => (
                         <tr key={t.id} className="hover:bg-gray-50 transition-all duration-150">
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-800">
-                            {t.carrier}
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-800">
+                            <span className="font-semibold">{t.airline}</span>
+                            <span className="text-gray-400 font-mono text-xs ml-1">({t.pnrPrefix})</span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-[#111827] font-semibold">
-                            {t.route}
+                            {t.origin} → {t.destination}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-xs text-[#6B7280]">
-                            {t.dateTime ? new Date(t.dateTime).toLocaleString() : "Not specified"}
+                            {t.departureDate}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-[#111827] font-bold">
                             ${t.price}

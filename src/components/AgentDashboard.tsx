@@ -118,14 +118,14 @@ export default function AgentDashboard({
           const data = docSnap.data();
           ticketList.push({
             id: docSnap.id,
-            title: data.title || data.route || "No Route Name",
-            route: data.route || data.title || "No Route Name",
-            dateTime: data.dateTime || "",
+            origin: data.origin || "",
+            destination: data.destination || "",
+            departureDate: data.departureDate || "",
             price: Number(data.price) || 0,
             availableSeats: Number(data.availableSeats) !== undefined ? Number(data.availableSeats) : (Number(data.totalSeats) || 0),
             totalSeats: Number(data.totalSeats) || 0,
-            carrier: data.carrier || data.airline || "Unknown Carrier",
-            airline: data.airline || data.carrier || "Unknown Carrier",
+            airline: data.airline || "",
+            pnrPrefix: data.pnrPrefix || "",
           });
         });
         setTickets(ticketList);
@@ -349,20 +349,20 @@ export default function AgentDashboard({
                       }`}
                     >
                       <div>
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase">
-                            {t.carrier}
-                          </span>
-                          <span className="text-base font-bold text-[#111827]">
-                            ${t.price}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-semibold text-[#111827]">{t.route}</h4>
-                        
-                        <div className="flex items-center gap-2 mt-3 text-xs text-[#6B7280]">
-                          <Calendar className="h-3.5 w-3.5" />
-                          <span>{t.dateTime ? new Date(t.dateTime).toLocaleString() : "Contact Carrier"}</span>
-                        </div>
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase">
+                              {t.airline} ({t.pnrPrefix})
+                            </span>
+                            <span className="text-base font-bold text-[#111827]">
+                              ${t.price}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-semibold text-[#111827]">{t.origin} to {t.destination}</h4>
+                          
+                          <div className="flex items-center gap-2 mt-3 text-xs text-[#6B7280]">
+                            <Calendar className="h-3.5 w-3.5" />
+                            <span>{t.departureDate}</span>
+                          </div>
                       </div>
 
                       <div className="mt-4 pt-3 border-t border-[#E5E7EB] flex items-center justify-between">
@@ -434,10 +434,10 @@ export default function AgentDashboard({
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="text-sm font-semibold text-[#111827]">
-                              {associatedFlight?.route || "Custom Sync Flight"}
+                              {b.ticketId}
                             </div>
                             <div className="text-xs text-[#6B7280]">
-                              {associatedFlight?.carrier || "Airline Partner"}
+                              Booking
                             </div>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
@@ -530,8 +530,8 @@ export default function AgentDashboard({
                     <X className="h-4 w-4" />
                   </button>
                   <p className="text-xs font-bold text-gray-400 uppercase">Selected Flight</p>
-                  <p className="text-sm font-bold text-[#111827] mt-1">{selectedTicket.route}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{selectedTicket.carrier} • ${selectedTicket.price}</p>
+                  <p className="text-sm font-bold text-[#111827] mt-1">{selectedTicket.origin} to {selectedTicket.destination}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{selectedTicket.airline} • ${selectedTicket.price}</p>
                 </div>
 
                 <Input

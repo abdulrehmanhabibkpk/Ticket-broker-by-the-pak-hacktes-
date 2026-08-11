@@ -2,14 +2,14 @@ import { Timestamp } from "firebase/firestore";
 
 export interface Ticket {
   id: string;
-  title: string;       // London to New York
-  route: string;       // Mirror title for compatibility
-  dateTime: string;    // String representation for simple parsing, or formatted
+  origin: string;
+  destination: string;
+  airline: string;
+  departureDate: string;
   price: number;
-  availableSeats: number;
   totalSeats: number;
-  carrier: string;     // Airline carrier
-  airline: string;     // Mirror carrier for compatibility
+  availableSeats: number;
+  pnrPrefix: string;
 }
 
 export interface Booking {
