@@ -198,16 +198,34 @@ export function LoadingSpinner({
   className?: string;
 }) {
   const sizes = {
-    sm: "h-4 w-4 border-2",
-    md: "h-8 w-8 border-3",
-    lg: "h-12 w-12 border-4",
+    sm: "w-4 h-4",
+    md: "w-8 h-8",
+    lg: "w-12 h-12",
   };
 
   return (
     <div className={`flex justify-center items-center ${className}`}>
-      <div
-        className={`animate-spin rounded-full border-t-[#1D4ED8] border-gray-200 ${sizes[size]}`}
-      ></div>
+      <svg
+        className={`animate-spin text-[#00a29c] ${sizes[size]}`}
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        {Array.from({ length: 12 }).map((_, i) => (
+          <line
+            key={i}
+            x1="12"
+            y1="2"
+            x2="12"
+            y2="7"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            transform={`rotate(${i * 30} 12 12)`}
+            opacity={0.15 + (i / 12) * 0.85}
+          />
+        ))}
+      </svg>
     </div>
   );
 }

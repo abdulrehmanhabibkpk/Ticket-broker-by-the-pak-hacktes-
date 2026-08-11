@@ -99,7 +99,7 @@ export default function App() {
 
   if (initializing) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F8FAFC]">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F9FAFB]">
         <div className="text-center space-y-4">
           <Plane className="h-10 w-10 text-[#133F5C] animate-pulse mx-auto" />
           <p className="text-sm font-bold text-gray-500">
@@ -113,7 +113,7 @@ export default function App() {
 
   // Pure clean display filling the entire workspace viewport perfectly
   return (
-    <div className="min-h-screen bg-[#F1F5F9] text-[#111827]">
+    <div className="min-h-screen bg-[#F9FAFB] text-[#111827]">
       {!user ? (
         <div className="p-4 sm:p-6 lg:p-8">
           <LoginRegister onLoginSuccess={handleLoginSuccess} />

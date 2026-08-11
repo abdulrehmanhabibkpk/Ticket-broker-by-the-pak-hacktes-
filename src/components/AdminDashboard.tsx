@@ -15,6 +15,8 @@ import { Ticket, Booking, LedgerTransaction, SystemNotification, UmrahPackage, U
 import { Button, Input, Card, Badge, LoadingSpinner, Alert } from "./UIComponents";
 import { TicketInvoiceModal } from "./TicketInvoiceModal";
 import { HotelVoucherModal } from "./HotelVoucherModal";
+import { UmrahPackageInvoiceModal } from "./UmrahPackageInvoiceModal";
+import { AddUserBalanceModal } from "./AddUserBalanceModal";
 import {
   Plane,
   Plus,
@@ -157,6 +159,67 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     booking: HotelBooking | null;
     hotel?: HotelListing | null;
   }>({ isOpen: false, booking: null, hotel: null });
+
+  // Umrah Invoice modal state
+  const [umrahInvoiceModal, setUmrahInvoiceModal] = useState<{
+    isOpen: boolean;
+    booking: UmrahBooking | null;
+    pkg?: UmrahPackage | null;
+  }>({ isOpen: false, booking: null, pkg: null });
+
+  // Add User Balance Modal state
+  const [isAddBalanceModalOpen, setIsAddBalanceModalOpen] = useState(false);
+
+  // Compute list of unique agents with net balances from Firestore collections
+  const uniqueAgents = React.useMemo(() => {
+    const map = new Map<string, { email: string; name: string; balance: number }>();
+
+    const defaultAgents = [
+      { email: "agent.partner@gmail.com", name: "Al-Harmain Travel Agency" },
+      { email: "makkah.travels@gmail.com", name: "Makkah Tours & Travels" },
+      { email: "subhan.travels@gmail.com", name: "Subhan Air Services" },
+    ];
+
+    defaultAgents.forEach((a) => {
+      map.set(a.email.toLowerCase(), { email: a.email.toLowerCase(), name: a.name, balance: 0 });
+    });
+
+    ledgers.forEach((l) => {
+      const email = (l.agentEmail || "").toLowerCase();
+      if (!email) return;
+      const existing = map.get(email) || { email, name: l.agentName || email, balance: 0 };
+      if (l.type === "Credit") {
+        existing.balance += Number(l.amount) || 0;
+      } else {
+        existing.balance -= Number(l.amount) || 0;
+      }
+      if (l.agentName && !existing.name) existing.name = l.agentName;
+      map.set(email, existing);
+    });
+
+    bookings.forEach((b) => {
+      const email = (b.agentEmail || "").toLowerCase();
+      if (email && !map.has(email)) {
+        map.set(email, { email, name: b.agentName || email, balance: 0 });
+      }
+    });
+
+    umrahBookings.forEach((b) => {
+      const email = (b.agentEmail || "").toLowerCase();
+      if (email && !map.has(email)) {
+        map.set(email, { email, name: b.agentName || email, balance: 0 });
+      }
+    });
+
+    hotelBookings.forEach((b) => {
+      const email = (b.agentEmail || "").toLowerCase();
+      if (email && !map.has(email)) {
+        map.set(email, { email, name: b.agentName || email, balance: 0 });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [ledgers, bookings, umrahBookings, hotelBookings]);
 
   // 1. Listen to Tickets real-time
   useEffect(() => {
@@ -452,7 +515,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   // 8. Listen to Hotel Bookings real-time
   useEffect(() => {
-    const q = query(collection(db, "hotel_bookings"), orderBy("timestamp", "desc"));
+    const q = query(collection(db, "hotelBookings"), orderBy("timestamp", "desc"));
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -467,16 +530,16 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             agentName: data.agentName || "",
             agentEmail: data.agentEmail || "",
             guestName: data.guestName || "",
-            guestPhone: data.guestPhone || "",
-            passportNo: data.passportNo || "",
+            guestPhone: data.guestPhone || data.phone || "",
+            passportNo: data.passportNo || data.passportNumber || "",
             checkInDate: data.checkInDate || "",
             checkOutDate: data.checkOutDate || "",
             nights: Number(data.nights) || 1,
             roomType: data.roomType || "",
-            numberOfRooms: Number(data.numberOfRooms) || 1,
+            numberOfRooms: Number(data.numberOfRooms) || Number(data.roomsCount) || 1,
             totalCost: Number(data.totalCost) || 0,
             status: data.status || "Pending",
-            timestamp: data.timestamp,
+            timestamp: data.timestamp || Date.now(),
           });
         });
         setHotelBookings(bookingsList);
@@ -941,7 +1004,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const handleToggleHotelBookingStatus = async (bookingId: string, currentStatus: string) => {
     try {
       const nextStatus = currentStatus === "Confirmed" ? "Pending" : "Confirmed";
-      const docRef = doc(db, "hotel_bookings", bookingId);
+      const docRef = doc(db, "hotelBookings", bookingId);
       await updateDoc(docRef, { status: nextStatus });
     } catch (err: any) {
       console.error("Update hotel booking status error:", err);
@@ -967,9 +1030,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
 
   return (
-    <div className="flex min-h-[90vh] bg-[#F1F5F9] -mx-4 sm:-mx-6 lg:-mx-8 -my-8 font-sans">
+    <div className="flex min-h-[90vh] bg-[#F9FAFB] -mx-4 sm:-mx-6 lg:-mx-8 -my-8 font-sans">
       
-      {/* SIDEBAR NAVIGATION - MATCHING SKY PASS STYLE */}
+      {/* SIDEBAR NAVIGATION - MATCHING BOOK BROKER STYLE */}
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between shrink-0 hidden md:flex">
         <div>
           {/* Logo brand */}
@@ -979,8 +1042,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
             <div>
               <h2 className="text-xl font-extrabold tracking-tight flex items-center gap-1 leading-none">
-                <span className="text-white font-black">SKY</span>
-                <span className="text-[#ff7300] font-black">PASS</span>
+                <span className="text-white font-black">BOOK </span>
+                <span className="text-[#ff7300] font-black">BROKER</span>
               </h2>
               <span className="text-[9px] text-gray-300 font-mono tracking-wider block mt-1">
                 SYSTEM ADMINISTRATOR
@@ -1137,7 +1200,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <span className="text-xs text-gray-400 hidden sm:inline">Global Administration Console</span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsAddBalanceModalOpen(true)}
+              className="bg-[#00a29c] hover:bg-[#00828a] text-white font-extrabold text-xs px-3.5 py-1.5 rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <CreditCard className="h-4 w-4" />
+              <span>➕ Add User Balance</span>
+            </button>
             <div className="bg-[#ff7300]/10 text-[#EA580C] font-bold text-xs px-3 py-1.5 rounded border border-[#ff7300]/20 flex items-center gap-1.5">
               <Users className="h-3.5 w-3.5" />
               <span>Active Flights: {tickets.length}</span>
@@ -1487,9 +1557,18 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               {/* Left Column: Ledger logs */}
               <div className="lg:col-span-8 space-y-4">
                 <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
-                  <div className="pb-4 border-b border-gray-100 mb-4">
-                    <h3 className="text-sm font-black text-[#133F5C]">All B2B Partner Ledger Records</h3>
-                    <p className="text-xs text-gray-500 mt-0.5">Global ledger transaction audit stream representing ticket deductions and credit top-ups</p>
+                  <div className="pb-4 border-b border-gray-100 mb-4 flex justify-between items-center flex-wrap gap-2">
+                    <div>
+                      <h3 className="text-sm font-black text-[#133F5C]">All B2B Partner Ledger Records</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Global ledger transaction audit stream representing ticket deductions and credit top-ups</p>
+                    </div>
+                    <button
+                      onClick={() => setIsAddBalanceModalOpen(true)}
+                      className="bg-[#00a29c] hover:bg-[#00828a] text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                    >
+                      <CreditCard className="h-3.5 w-3.5" />
+                      <span>➕ Add User Balance</span>
+                    </button>
                   </div>
 
                   {loadingLedgers ? (
@@ -2063,16 +2142,31 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                               <Badge status={b.status} />
                             </td>
                             <td className="px-4 py-3">
-                              <button
-                                onClick={() => handleToggleUmrahBookingStatus(b.bookingId, b.status)}
-                                className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                                  b.status === "Confirmed"
-                                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                                    : "bg-green-600 hover:bg-green-700 text-white shadow-xs"
-                                }`}
-                              >
-                                {b.status === "Confirmed" ? "Set Pending" : "Confirm Tour"}
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() =>
+                                    setUmrahInvoiceModal({
+                                      isOpen: true,
+                                      booking: b,
+                                      pkg: associatedPkg,
+                                    })
+                                  }
+                                  className="px-2.5 py-1 bg-[#b45309] hover:bg-[#92400e] text-white text-xs font-bold rounded shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  <span>Voucher</span>
+                                </button>
+                                <button
+                                  onClick={() => handleToggleUmrahBookingStatus(b.bookingId, b.status)}
+                                  className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                                    b.status === "Confirmed"
+                                      ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                                      : "bg-green-600 hover:bg-green-700 text-white shadow-xs"
+                                  }`}
+                                >
+                                  {b.status === "Confirmed" ? "Set Pending" : "Confirm Tour"}
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -2486,6 +2580,21 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         onClose={() => setVoucherModal({ isOpen: false, booking: null, hotel: null })}
         booking={voucherModal.booking}
         hotel={voucherModal.hotel}
+      />
+
+      {/* UMRAH PACKAGE INVOICE MODAL */}
+      <UmrahPackageInvoiceModal
+        isOpen={umrahInvoiceModal.isOpen}
+        onClose={() => setUmrahInvoiceModal({ isOpen: false, booking: null, pkg: null })}
+        booking={umrahInvoiceModal.booking}
+        pkg={umrahInvoiceModal.pkg}
+      />
+
+      {/* ADD USER BALANCE MODAL */}
+      <AddUserBalanceModal
+        isOpen={isAddBalanceModalOpen}
+        onClose={() => setIsAddBalanceModalOpen(false)}
+        agents={uniqueAgents}
       />
 
     </div>

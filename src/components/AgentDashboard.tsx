@@ -16,6 +16,7 @@ import { Ticket, Booking, LedgerTransaction, SystemNotification, UmrahPackage, U
 import { Button, Input, Card, Badge, LoadingSpinner, Alert } from "./UIComponents";
 import { TicketInvoiceModal } from "./TicketInvoiceModal";
 import { HotelVoucherModal } from "./HotelVoucherModal";
+import { UmrahPackageInvoiceModal } from "./UmrahPackageInvoiceModal";
 import {
   Plane,
   Plus,
@@ -186,6 +187,13 @@ export default function AgentDashboard({
     booking: HotelBooking | null;
     hotel?: HotelListing | null;
   }>({ isOpen: false, booking: null, hotel: null });
+
+  // Umrah Invoice modal state
+  const [umrahInvoiceModal, setUmrahInvoiceModal] = useState<{
+    isOpen: boolean;
+    booking: UmrahBooking | null;
+    pkg?: UmrahPackage | null;
+  }>({ isOpen: false, booking: null, pkg: null });
 
   // Real-time listener for flights
   useEffect(() => {
@@ -422,9 +430,9 @@ export default function AgentDashboard({
 
   // Listen to My Hotel Bookings real-time
   useEffect(() => {
+    // Note: Android app sends agentName instead of agentEmail, so we fetch all and filter client-side for this agent
     const q = query(
-      collection(db, "hotel_bookings"),
-      where("agentEmail", "==", agentEmail)
+      collection(db, "hotelBookings")
     );
     const unsubscribe = onSnapshot(
       q,
@@ -432,25 +440,28 @@ export default function AgentDashboard({
         const list: HotelBooking[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          list.push({
-            bookingId: docSnap.id,
-            hotelId: data.hotelId || "",
-            hotelName: data.hotelName || "",
-            city: data.city || "",
-            agentName: data.agentName || "",
-            agentEmail: data.agentEmail || "",
-            guestName: data.guestName || "",
-            guestPhone: data.guestPhone || "",
-            passportNo: data.passportNo || "",
-            checkInDate: data.checkInDate || "",
-            checkOutDate: data.checkOutDate || "",
-            nights: Number(data.nights) || 1,
-            roomType: data.roomType || "",
-            numberOfRooms: Number(data.numberOfRooms) || 1,
-            totalCost: Number(data.totalCost) || 0,
-            status: data.status || "Pending",
-            timestamp: data.timestamp,
-          });
+          // Client side filter to match agentEmail or agentName
+          if (data.agentEmail === agentEmail || data.agentName === agentName || data.agentName === agentEmail.split("@")[0]) {
+            list.push({
+              bookingId: docSnap.id,
+              hotelId: data.hotelId || "",
+              hotelName: data.hotelName || "",
+              city: data.city || "",
+              agentName: data.agentName || "",
+              agentEmail: data.agentEmail || "",
+              guestName: data.guestName || "",
+              guestPhone: data.guestPhone || data.phone || "",
+              passportNo: data.passportNo || data.passportNumber || "",
+              checkInDate: data.checkInDate || "",
+              checkOutDate: data.checkOutDate || "",
+              nights: Number(data.nights) || 1,
+              roomType: data.roomType || "",
+              numberOfRooms: Number(data.numberOfRooms) || Number(data.roomsCount) || 1,
+              totalCost: Number(data.totalCost) || 0,
+              status: data.status || "Pending",
+              timestamp: data.timestamp || Date.now(),
+            });
+          }
         });
         setMyHotelBookings(list);
       },
@@ -761,7 +772,7 @@ export default function AgentDashboard({
 
     try {
       // 1. Create Hotel Booking record
-      const bookingRef = await addDoc(collection(db, "hotel_bookings"), {
+      const bookingRef = await addDoc(collection(db, "hotelBookings"), {
         hotelId: selectedHotel.id,
         hotelName: selectedHotel.name,
         city: selectedHotel.city,
@@ -939,20 +950,20 @@ export default function AgentDashboard({
   ];
 
   return (
-    <div className="flex min-h-[90vh] bg-[#F1F5F9] -mx-4 sm:-mx-6 lg:-mx-8 -my-8 font-sans">
+    <div className="flex min-h-[90vh] bg-[#F9FAFB] -mx-4 sm:-mx-6 lg:-mx-8 -my-8 font-sans">
       
-      {/* SIDEBAR NAVIGATION - MATCHING SKY PASS EXACT STYLE & DESIGN */}
+      {/* SIDEBAR NAVIGATION - MATCHING BOOK BROKER EXACT STYLE & DESIGN */}
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between shrink-0 hidden md:flex">
         <div>
-          {/* Sky Pass Brand Header with Jet icon */}
+          {/* Book Broker Brand Header with Jet icon */}
           <div className="p-6 border-b border-gray-100 flex items-center gap-3 bg-[#133F5C] text-white">
             <div className="bg-[#ff7300] p-1.5 rounded-full flex items-center justify-center">
               <Plane className="h-5 w-5 text-white transform -rotate-45" />
             </div>
             <div>
               <h2 className="text-xl font-extrabold tracking-tight flex items-center gap-1 leading-none">
-                <span className="text-white">SKY</span>
-                <span className="text-[#ff7300]">PASS</span>
+                <span className="text-white">BOOK </span>
+                <span className="text-[#ff7300]">BROKER</span>
               </h2>
               <span className="text-[9px] text-gray-300 font-mono tracking-wider block mt-1">
                 B2B RESERVATIONS
@@ -1862,7 +1873,7 @@ export default function AgentDashboard({
                       </div>
                     </div>
                     <div className="text-xs space-y-1.5 text-gray-600">
-                      <p><strong>Account Name:</strong> Skypass Travel & Tours</p>
+                      <p><strong>Account Name:</strong> Book Broker Travel & Tours</p>
                       <p><strong>Account Number:</strong> 0513-010543210</p>
                       <p><strong>Branch:</strong> Blue Area Branch, Islamabad</p>
                       <p><strong>IBAN:</strong> PK87MEZN0513010543210</p>
@@ -1879,7 +1890,7 @@ export default function AgentDashboard({
                       </div>
                     </div>
                     <div className="text-xs space-y-1.5 text-gray-600">
-                      <p><strong>Account Name:</strong> Skypass Travel & Tours</p>
+                      <p><strong>Account Name:</strong> Book Broker Travel & Tours</p>
                       <p><strong>Account Number:</strong> 0010-065432102</p>
                       <p><strong>Branch:</strong> F-10 Markaz, Islamabad</p>
                       <p><strong>IBAN:</strong> PK54ALHL0010065432102</p>
@@ -1896,7 +1907,7 @@ export default function AgentDashboard({
                       </div>
                     </div>
                     <div className="text-xs space-y-1.5 text-gray-600">
-                      <p><strong>Account Name:</strong> Skypass Travel & Tours</p>
+                      <p><strong>Account Name:</strong> Book Broker Travel & Tours</p>
                       <p><strong>Account Number:</strong> 2201-987654321</p>
                       <p><strong>Branch:</strong> Jinnah Avenue Branch, Islamabad</p>
                       <p><strong>IBAN:</strong> PK92HABB2201987654321</p>
@@ -2167,6 +2178,7 @@ export default function AgentDashboard({
                             <th className="px-4 py-3 text-left">Passenger Details</th>
                             <th className="px-4 py-3 text-left">Uploaded Documents</th>
                             <th className="px-4 py-3 text-left">Booking Status</th>
+                            <th className="px-4 py-3 text-right">Voucher</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 bg-white">
@@ -2225,6 +2237,21 @@ export default function AgentDashboard({
                                 </td>
                                 <td className="px-4 py-3">
                                   <Badge status={b.status} />
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <button
+                                    onClick={() =>
+                                      setUmrahInvoiceModal({
+                                        isOpen: true,
+                                        booking: b,
+                                        pkg: p,
+                                      })
+                                    }
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#b45309] hover:bg-[#92400e] text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                    <span>Umrah Voucher</span>
+                                  </button>
                                 </td>
                               </tr>
                             );
@@ -2679,6 +2706,14 @@ export default function AgentDashboard({
         onClose={() => setVoucherModal({ isOpen: false, booking: null, hotel: null })}
         booking={voucherModal.booking}
         hotel={voucherModal.hotel}
+      />
+
+      {/* UMRAH PACKAGE INVOICE MODAL */}
+      <UmrahPackageInvoiceModal
+        isOpen={umrahInvoiceModal.isOpen}
+        onClose={() => setUmrahInvoiceModal({ isOpen: false, booking: null, pkg: null })}
+        booking={umrahInvoiceModal.booking}
+        pkg={umrahInvoiceModal.pkg}
       />
 
     </div>

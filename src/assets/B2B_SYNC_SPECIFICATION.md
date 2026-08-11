@@ -1,7 +1,7 @@
-# SKY PASS: B2B Ticket Booking Sync Specifications
+# BOOK BROKER: B2B Ticket Booking Sync Specifications
 > Built by **The Pak Hacktes Team** for seamless Web & Android client synchronization.
 
-This document contains the exact database architectures, collection schemas, state parameters, and UI design colors utilized in the Sky Pass Web Portal. Use this specification to implement and configure the corresponding Android mobile client perfectly.
+This document contains the exact database architectures, collection schemas, state parameters, and UI design colors utilized in the Book Broker Web Portal. Use this specification to implement and configure the corresponding Android mobile client perfectly.
 
 ---
 
