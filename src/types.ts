@@ -25,10 +25,21 @@ export interface Booking {
   timestamp: Timestamp | any;
 }
 
-export interface UserProfile {
-  uid: string;
-  email: string;
-  emailVerified: boolean;
-  displayName: string;
-  role: "admin" | "agent";
+export interface LedgerTransaction {
+  id: string;
+  agentEmail: string;
+  agentName: string;
+  type: "Credit" | "Debit" | string; // Credit = Deposit, Debit = Ticket purchase
+  amount: number;
+  description: string;
+  timestamp: Timestamp | any;
 }
+
+export interface SystemNotification {
+  id: string;
+  title: string;
+  content: string;
+  timestamp: Timestamp | any;
+  type: "alert" | "info" | "promo" | string;
+}
+
