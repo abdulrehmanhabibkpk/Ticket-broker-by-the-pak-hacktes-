@@ -73,8 +73,12 @@ export default function LoginRegister({
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // Force reload to get latest verified status
-        await reload(user);
+        // Attempt reload to fetch latest verified status, catching network warnings gracefully
+        try {
+          await reload(user);
+        } catch (reloadErr) {
+          console.warn("Network reload warning during login:", reloadErr);
+        }
 
         if (!user.emailVerified) {
           await signOut(auth);

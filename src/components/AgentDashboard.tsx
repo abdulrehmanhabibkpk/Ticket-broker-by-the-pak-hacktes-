@@ -12,8 +12,10 @@ import {
   getDoc,
   addDoc
 } from "firebase/firestore";
-import { Ticket, Booking, LedgerTransaction, SystemNotification } from "../types";
+import { Ticket, Booking, LedgerTransaction, SystemNotification, UmrahPackage, UmrahBooking, HotelListing, HotelBooking } from "../types";
 import { Button, Input, Card, Badge, LoadingSpinner, Alert } from "./UIComponents";
+import { TicketInvoiceModal } from "./TicketInvoiceModal";
+import { HotelVoucherModal } from "./HotelVoucherModal";
 import {
   Plane,
   Plus,
@@ -37,7 +39,13 @@ import {
   Sparkles,
   HelpCircle,
   ShieldCheck,
-  Percent
+  Percent,
+  Hotel,
+  BedDouble,
+  Building,
+  Building2,
+  MapPin,
+  Star
 } from "lucide-react";
 
 // Client-side lightweight image compressor to Base64 (JPG, 70% quality, max 400x400px)
@@ -101,8 +109,42 @@ export default function AgentDashboard({
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [loadingLedgers, setLoadingLedgers] = useState(true);
 
-  // Selected sidebar navigation tab: 'dashboard' | 'book_tickets' | 'bookings' | 'ledger' | 'notifications' | 'banks' | 'umrah'
+  // Dynamic Umrah Packages and Bookings state
+  const [dbUmrahPackages, setDbUmrahPackages] = useState<UmrahPackage[]>([]);
+  const [myUmrahBookings, setMyUmrahBookings] = useState<UmrahBooking[]>([]);
+  const [loadingUmrah, setLoadingUmrah] = useState(true);
+
+  // Booking Flow for Umrah
+  const [selectedUmrahPkg, setSelectedUmrahPkg] = useState<UmrahPackage | null>(null);
+  const [umrahPassengerName, setUmrahPassengerName] = useState("");
+  const [umrahPassengerPassport, setUmrahPassengerPassport] = useState("");
+  const [umrahPassengerPhoto, setUmrahPassengerPhoto] = useState("");
+  const [umrahPassportPhoto, setUmrahPassportPhoto] = useState("");
+  const [umrahPassengerPhotoName, setUmrahPassengerPhotoName] = useState("");
+  const [umrahPassportPhotoName, setUmrahPassportPhotoName] = useState("");
+  const [umrahBookingLoading, setUmrahBookingLoading] = useState(false);
+
+  // Dynamic Hotels and Hotel Bookings state
+  const [hotels, setHotels] = useState<HotelListing[]>([]);
+  const [myHotelBookings, setMyHotelBookings] = useState<HotelBooking[]>([]);
+  const [loadingHotels, setLoadingHotels] = useState(true);
+  const [selectedCityFilter, setSelectedCityFilter] = useState<string>("All");
+
+  // Hotel Booking Flow Form State
+  const [selectedHotel, setSelectedHotel] = useState<HotelListing | null>(null);
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestPassport, setGuestPassport] = useState("");
+  const [checkInDate, setCheckInDate] = useState("");
+  const [checkOutDate, setCheckOutDate] = useState("");
+  const [roomType, setRoomType] = useState("Quad / Sharing Room");
+  const [numberOfRooms, setNumberOfRooms] = useState<number>(1);
+  const [hotelBookingLoading, setHotelBookingLoading] = useState(false);
+  const [hotelStatusMsg, setHotelStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Selected sidebar navigation tab: 'dashboard' | 'book_tickets' | 'bookings' | 'ledger' | 'notifications' | 'banks' | 'umrah' | 'hotels'
   const [activeTab, setActiveTab] = useState<string>("dashboard");
+
 
   // Flight search/filter state
   const [selectedSectorFilter, setSelectedSectorFilter] = useState<string>("All Types");
@@ -130,6 +172,20 @@ export default function AgentDashboard({
     title: string;
     imgUrl: string;
   }>({ isOpen: false, title: "", imgUrl: "" });
+
+  // Ticket Invoice modal state
+  const [invoiceModal, setInvoiceModal] = useState<{
+    isOpen: boolean;
+    booking: Booking | null;
+    ticket?: Ticket | null;
+  }>({ isOpen: false, booking: null, ticket: null });
+
+  // Hotel Voucher modal state
+  const [voucherModal, setVoucherModal] = useState<{
+    isOpen: boolean;
+    booking: HotelBooking | null;
+    hotel?: HotelListing | null;
+  }>({ isOpen: false, booking: null, hotel: null });
 
   // Real-time listener for flights
   useEffect(() => {
@@ -258,6 +314,153 @@ export default function AgentDashboard({
     );
     return () => unsubscribe();
   }, []);
+
+  // Listen to dynamic Umrah packages
+  useEffect(() => {
+    const q = query(collection(db, "umrah_packages"));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const pkgsList: UmrahPackage[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          pkgsList.push({
+            id: docSnap.id,
+            days: data.days || "",
+            airline: data.airline || "",
+            flightNoDep: data.flightNoDep || "",
+            flightNoRet: data.flightNoRet || "",
+            depDetails: data.depDetails || "",
+            retDetails: data.retDetails || "",
+            baggage: data.baggage || "",
+            price: Number(data.price) || 0,
+            hotelMakkah: data.hotelMakkah || "",
+            hotelMadinah: data.hotelMadinah || "",
+            totalSeats: Number(data.totalSeats) || 0,
+            availableSeats: data.availableSeats !== undefined ? Number(data.availableSeats) : (Number(data.totalSeats) || 0),
+          });
+        });
+        setDbUmrahPackages(pkgsList);
+        setLoadingUmrah(false);
+      },
+      (error) => {
+        console.error("Error listening to Umrah packages:", error);
+        setLoadingUmrah(false);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  // Listen to my Umrah bookings
+  useEffect(() => {
+    const q = query(
+      collection(db, "umrah_bookings"),
+      where("agentEmail", "==", agentEmail)
+    );
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const bookingsList: UmrahBooking[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          bookingsList.push({
+            bookingId: docSnap.id,
+            packageId: data.packageId || "",
+            agentName: data.agentName || "",
+            agentEmail: data.agentEmail || "",
+            passengerName: data.passengerName || "",
+            passengerPassport: data.passengerPassport || "",
+            passengerPhotoUrl: data.passengerPhotoUrl || "",
+            passportPhotoUrl: data.passportPhotoUrl || "",
+            status: data.status || "Pending",
+            timestamp: data.timestamp,
+          });
+        });
+        setMyUmrahBookings(bookingsList);
+      },
+      (error) => {
+        console.error("Error listening to my Umrah bookings:", error);
+      }
+    );
+    return () => unsubscribe();
+  }, [agentEmail]);
+
+  // Listen to Hotels real-time
+  useEffect(() => {
+    const q = query(collection(db, "hotels"));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const hotelList: HotelListing[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          hotelList.push({
+            id: docSnap.id,
+            name: data.name || "",
+            city: data.city || "Makkah",
+            stars: Number(data.stars) || 5,
+            distanceToHaram: data.distanceToHaram || "",
+            roomTypes: data.roomTypes || "",
+            pricePerNight: Number(data.pricePerNight) || 0,
+            totalRooms: Number(data.totalRooms) || 0,
+            availableRooms: data.availableRooms !== undefined ? Number(data.availableRooms) : (Number(data.totalRooms) || 0),
+            imageUrl: data.imageUrl || "",
+            amenities: data.amenities || "",
+            description: data.description || "",
+          });
+        });
+        setHotels(hotelList);
+        setLoadingHotels(false);
+      },
+      (error) => {
+        console.error("Error listening to hotels:", error);
+        setLoadingHotels(false);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  // Listen to My Hotel Bookings real-time
+  useEffect(() => {
+    const q = query(
+      collection(db, "hotel_bookings"),
+      where("agentEmail", "==", agentEmail)
+    );
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list: HotelBooking[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            bookingId: docSnap.id,
+            hotelId: data.hotelId || "",
+            hotelName: data.hotelName || "",
+            city: data.city || "",
+            agentName: data.agentName || "",
+            agentEmail: data.agentEmail || "",
+            guestName: data.guestName || "",
+            guestPhone: data.guestPhone || "",
+            passportNo: data.passportNo || "",
+            checkInDate: data.checkInDate || "",
+            checkOutDate: data.checkOutDate || "",
+            nights: Number(data.nights) || 1,
+            roomType: data.roomType || "",
+            numberOfRooms: Number(data.numberOfRooms) || 1,
+            totalCost: Number(data.totalCost) || 0,
+            status: data.status || "Pending",
+            timestamp: data.timestamp,
+          });
+        });
+        setMyHotelBookings(list);
+      },
+      (error) => {
+        console.error("Error listening to my hotel bookings:", error);
+      }
+    );
+    return () => unsubscribe();
+  }, [agentEmail]);
+
 
   // Compute Current Ledger Balance (Sum of Credits - Sum of Debits)
   const totalCredits = ledgers
@@ -395,6 +598,230 @@ export default function AgentDashboard({
     }
   };
 
+  const handleUmrahPassengerPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUmrahPassengerPhotoName(file.name);
+      try {
+        const base64 = await compressImage(file);
+        setUmrahPassengerPhoto(base64);
+      } catch (err) {
+        console.error("Failed to compress passenger image:", err);
+      }
+    }
+  };
+
+  const handleUmrahPassportPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUmrahPassportPhotoName(file.name);
+      try {
+        const base64 = await compressImage(file);
+        setUmrahPassportPhoto(base64);
+      } catch (err) {
+        console.error("Failed to compress passport image:", err);
+      }
+    }
+  };
+
+  const handleBookUmrahPackage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBookingStatus(null);
+
+    if (!selectedUmrahPkg) return;
+
+    if (selectedUmrahPkg.availableSeats <= 0) {
+      setBookingStatus({
+        type: "error",
+        text: "This Umrah package has no seats remaining.",
+      });
+      return;
+    }
+
+    if (currentBalance < selectedUmrahPkg.price) {
+      setBookingStatus({
+        type: "error",
+        text: `Insufficient ledger credit! Umrah Package costs PKR ${selectedUmrahPkg.price.toLocaleString()}, your current balance is PKR ${currentBalance.toLocaleString()}. Please transfer funds via "Banks Detail" page.`,
+      });
+      return;
+    }
+
+    setUmrahBookingLoading(true);
+
+    try {
+      const pkgRef = doc(db, "umrah_packages", selectedUmrahPkg.id);
+      const pkgSnap = await getDoc(pkgRef);
+      if (!pkgSnap.exists()) {
+        throw new Error("This Umrah package listing does not exist anymore.");
+      }
+
+      const freshPkgData = pkgSnap.data();
+      const currentAvailableSeats = Number(freshPkgData.availableSeats);
+
+      if (currentAvailableSeats <= 0) {
+        throw new Error("Umrah package has just been fully booked by another agency.");
+      }
+
+      // 1. Create unique Booking ID and upload to Firestore
+      const bookingsColRef = collection(db, "umrah_bookings");
+      const newBookingDocRef = doc(bookingsColRef);
+      const bookingId = newBookingDocRef.id;
+
+      const bookingOrder: UmrahBooking = {
+        bookingId: bookingId,
+        packageId: selectedUmrahPkg.id,
+        agentName: agentName,
+        agentEmail: agentEmail,
+        passengerName: umrahPassengerName,
+        passengerPassport: umrahPassengerPassport,
+        passengerPhotoUrl: umrahPassengerPhoto,
+        passportPhotoUrl: umrahPassportPhoto,
+        status: "Pending",
+        timestamp: new Date()
+      };
+
+      await setDoc(newBookingDocRef, bookingOrder);
+
+      // 2. Decrement available seats in Firestore immediately
+      await updateDoc(pkgRef, {
+        availableSeats: currentAvailableSeats - 1,
+      });
+
+      // 3. Create a debit transaction in the ledger statement
+      const ledgerColRef = collection(db, "ledgers");
+      await addDoc(ledgerColRef, {
+        agentEmail: agentEmail,
+        agentName: agentName,
+        type: "Debit",
+        amount: selectedUmrahPkg.price,
+        description: `B2B Umrah Package Purchase: ${selectedUmrahPkg.airline} (${selectedUmrahPkg.days}) for passenger ${umrahPassengerName}`,
+        timestamp: new Date()
+      });
+
+      setBookingStatus({
+        type: "success",
+        text: `Umrah Package booked successfully for ${umrahPassengerName}! Booking ID is #${bookingId.substring(0, 8)}. PKR ${selectedUmrahPkg.price.toLocaleString()} deducted from ledger.`,
+      });
+
+      // Reset Booking form
+      setUmrahPassengerName("");
+      setUmrahPassengerPassport("");
+      setUmrahPassengerPhoto("");
+      setUmrahPassportPhoto("");
+      setUmrahPassengerPhotoName("");
+      setUmrahPassportPhotoName("");
+      setSelectedUmrahPkg(null);
+    } catch (err: any) {
+      console.error("Umrah Booking error:", err);
+      setBookingStatus({
+        type: "error",
+        text: err.message || "Failed to book Umrah Package. Please retry.",
+      });
+    } finally {
+      setUmrahBookingLoading(false);
+    }
+  };
+
+  const handleBookHotel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setHotelStatusMsg(null);
+
+    if (!selectedHotel) return;
+
+    if (!guestName.trim() || !guestPhone.trim() || !guestPassport.trim()) {
+      setHotelStatusMsg({ type: "error", text: "Please enter Guest Name, Phone Number, and Passport Number." });
+      return;
+    }
+    if (!checkInDate || !checkOutDate) {
+      setHotelStatusMsg({ type: "error", text: "Please select valid Check-in and Check-out dates." });
+      return;
+    }
+
+    const start = new Date(checkInDate);
+    const end = new Date(checkOutDate);
+    const diffTime = end.getTime() - start.getTime();
+    const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+    if (isNaN(diffTime) || diffTime <= 0) {
+      setHotelStatusMsg({ type: "error", text: "Check-out date must be after Check-in date." });
+      return;
+    }
+
+    const totalCost = selectedHotel.pricePerNight * nights * numberOfRooms;
+
+    if (totalCost > currentBalance) {
+      setHotelStatusMsg({
+        type: "error",
+        text: `Insufficient ledger credit balance. Total booking cost is PKR ${totalCost.toLocaleString()}, but your balance is PKR ${currentBalance.toLocaleString()}. Please top up your ledger balance with Admin.`,
+      });
+      return;
+    }
+
+    setHotelBookingLoading(true);
+
+    try {
+      // 1. Create Hotel Booking record
+      const bookingRef = await addDoc(collection(db, "hotel_bookings"), {
+        hotelId: selectedHotel.id,
+        hotelName: selectedHotel.name,
+        city: selectedHotel.city,
+        agentName,
+        agentEmail,
+        guestName: guestName.trim(),
+        guestPhone: guestPhone.trim(),
+        passportNo: guestPassport.trim(),
+        checkInDate,
+        checkOutDate,
+        nights,
+        roomType,
+        numberOfRooms,
+        totalCost,
+        status: "Pending",
+        timestamp: new Date(),
+      });
+
+      // 2. Add Debit entry to Ledgers log
+      await addDoc(collection(db, "ledgers"), {
+        agentEmail,
+        agentName,
+        type: "Debit",
+        amount: totalCost,
+        description: `Hotel Booking Ref #${bookingRef.id.substring(0, 8)} - ${selectedHotel.name} (${selectedHotel.city}, ${nights} night(s), ${numberOfRooms} room(s))`,
+        timestamp: new Date(),
+      });
+
+      // 3. Decrement availableRooms in Hotel document
+      const hotelRef = doc(db, "hotels", selectedHotel.id);
+      const hotelSnap = await getDoc(hotelRef);
+      if (hotelSnap.exists()) {
+        const currentAvail = Number(hotelSnap.data().availableRooms) || 0;
+        await updateDoc(hotelRef, {
+          availableRooms: Math.max(0, currentAvail - numberOfRooms),
+        });
+      }
+
+      setHotelStatusMsg({
+        type: "success",
+        text: `Hotel reservation submitted successfully for ${guestName}! Ref ID: #${bookingRef.id.substring(0, 8)}. Total PKR ${totalCost.toLocaleString()} debited from ledger.`,
+      });
+
+      // Reset form
+      setGuestName("");
+      setGuestPhone("");
+      setGuestPassport("");
+      setCheckInDate("");
+      setCheckOutDate("");
+      setNumberOfRooms(1);
+      setSelectedHotel(null);
+    } catch (err: any) {
+      console.error("Hotel booking error:", err);
+      setHotelStatusMsg({ type: "error", text: "Failed to process hotel reservation: " + err.message });
+    } finally {
+      setHotelBookingLoading(false);
+    }
+  };
+
+
   // Filter Logic matching Image 1 top tabs (UAE, KSA, Oman, etc.)
   const getFilteredTickets = () => {
     return tickets.filter((t) => {
@@ -462,8 +889,8 @@ export default function AgentDashboard({
 
   const groupedFlights = groupFlightsBySector(filteredTickets);
 
-  // Static Umrah Packages lists matching Image 3 structure
-  const umrahPackages = [
+  // Dynamic Umrah Packages fallback to standard list for pristine initial state
+  const umrahPackages = dbUmrahPackages.length > 0 ? dbUmrahPackages : [
     {
       id: "pkg-1",
       days: "21 Days",
@@ -474,6 +901,10 @@ export default function AgentDashboard({
       retDetails: "JED 05 Sep 18:10 → ISB 06 Sep 01:10 (Non Stop • 5h)",
       baggage: "Departure 23 KG | Arrival 46 KG",
       price: 255500,
+      hotelMakkah: "Makkah Concorde Hotel",
+      hotelMadinah: "Al Ansar Golden Tulip",
+      totalSeats: 50,
+      availableSeats: 48,
     },
     {
       id: "pkg-2",
@@ -485,6 +916,10 @@ export default function AgentDashboard({
       retDetails: "JED 07 Sep 01:50 → ISB 07 Sep 08:50 (Non Stop)",
       baggage: "Departure 23 KG | Arrival 46 KG",
       price: 255500,
+      hotelMakkah: "Swissôtel Al Maqam",
+      hotelMadinah: "Pullman Zamzam Madina",
+      totalSeats: 50,
+      availableSeats: 45,
     },
     {
       id: "pkg-3",
@@ -496,6 +931,10 @@ export default function AgentDashboard({
       retDetails: "JED 10 Sep 11:05 → ISB 10 Sep 18:05 (Non Stop)",
       baggage: "Departure 20 KG | Arrival 30 KG",
       price: 252999,
+      hotelMakkah: "Dar Al Eiman Royal",
+      hotelMadinah: "Grand Plaza Madinah",
+      totalSeats: 40,
+      availableSeats: 38,
     },
   ];
 
@@ -604,7 +1043,32 @@ export default function AgentDashboard({
               <Landmark className="h-4 w-4" />
               <span>Banks Detail</span>
             </button>
+
+            <button
+              onClick={() => { setActiveTab("umrah"); setSelectedTicket(null); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                activeTab === "umrah"
+                  ? "bg-[#00a29c] text-white shadow-xs"
+                  : "text-[#133F5C] hover:bg-gray-50"
+              }`}
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Umrah Packages</span>
+            </button>
+
+            <button
+              onClick={() => { setActiveTab("hotels"); setSelectedTicket(null); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                activeTab === "hotels"
+                  ? "bg-[#00a29c] text-white shadow-xs"
+                  : "text-[#133F5C] hover:bg-gray-50"
+              }`}
+            >
+              <Hotel className="h-4 w-4" />
+              <span>Hotel Booking</span>
+            </button>
           </nav>
+
         </div>
 
         {/* User profile bottom details */}
@@ -681,32 +1145,32 @@ export default function AgentDashboard({
                 </div>
               </div>
 
-              {/* Selection cards matching Image 4 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto py-4">
+              {/* Selection cards matching user request */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto py-4">
                 
-                {/* Card 1: Group Tickets (Blue card with flight image) */}
+                {/* Card 1: Group Tickets (Blue card) */}
                 <div className="bg-gradient-to-br from-[#1E40AF] to-[#3B82F6] text-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col justify-between h-[360px] group border-4 border-white">
-                  <div className="p-6 text-center">
-                    <div className="inline-flex p-3 bg-white/10 rounded-full mb-3">
-                      <Plane className="h-6 w-6 text-white transform -rotate-45" />
+                  <div className="p-5 text-center">
+                    <div className="inline-flex p-2.5 bg-white/10 rounded-full mb-2">
+                      <Plane className="h-5 w-5 text-white transform -rotate-45" />
                     </div>
-                    <h3 className="text-2xl font-black uppercase tracking-tight">Group Tickets</h3>
-                    <p className="text-xs text-blue-100 mt-1">Book block seats on premium routes instantly</p>
+                    <h3 className="text-xl font-black uppercase tracking-tight">Group Tickets</h3>
+                    <p className="text-[11px] text-blue-100 mt-0.5">Book block seats on premium routes instantly</p>
                   </div>
 
-                  <div className="px-6 flex justify-center flex-1 items-center overflow-hidden">
+                  <div className="px-5 flex justify-center flex-1 items-center overflow-hidden">
                     <img
                       src="/src/assets/images/airplane_card_1786469847543.jpg"
                       alt="Airplane Group Tickets"
-                      className="h-32 w-full object-cover rounded-lg group-hover:scale-105 transition-all duration-300 shadow-md"
+                      className="h-28 w-full object-cover rounded-lg group-hover:scale-105 transition-all duration-300 shadow-md"
                       referrerPolicy="no-referrer"
                     />
                   </div>
 
-                  <div className="p-6">
+                  <div className="p-5">
                     <button
                       onClick={() => setActiveTab("book_tickets")}
-                      className="w-full bg-white hover:bg-gray-50 text-[#1E40AF] font-bold py-3 px-4 rounded-xl text-xs transition-all duration-150 flex items-center justify-center gap-2 shadow-sm"
+                      className="w-full bg-white hover:bg-gray-50 text-[#1E40AF] font-bold py-2.5 px-4 rounded-xl text-xs transition-all duration-150 flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                     >
                       <span>Click To Book Now</span>
                       <ChevronRight className="h-4 w-4" />
@@ -714,37 +1178,69 @@ export default function AgentDashboard({
                   </div>
                 </div>
 
-                {/* Card 2: Umrah Group Packages (Orange card with Kaaba image) */}
+                {/* Card 2: Umrah Group Packages (Orange card) */}
                 <div className="bg-gradient-to-br from-[#EA580C] to-[#F97316] text-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col justify-between h-[360px] group border-4 border-white">
-                  <div className="p-6 text-center">
-                    <div className="inline-flex p-3 bg-white/10 rounded-full mb-3">
-                      <Sparkles className="h-6 w-6 text-white" />
+                  <div className="p-5 text-center">
+                    <div className="inline-flex p-2.5 bg-white/10 rounded-full mb-2">
+                      <Sparkles className="h-5 w-5 text-white" />
                     </div>
-                    <h3 className="text-2xl font-black uppercase tracking-tight">Umrah Group Packages</h3>
-                    <p className="text-xs text-orange-100 mt-1">Explore all premium Umrah listings & flights</p>
+                    <h3 className="text-xl font-black uppercase tracking-tight">Umrah Packages</h3>
+                    <p className="text-[11px] text-orange-100 mt-0.5">Explore all premium Umrah listings & flights</p>
                   </div>
 
-                  <div className="px-6 flex justify-center flex-1 items-center overflow-hidden">
+                  <div className="px-5 flex justify-center flex-1 items-center overflow-hidden">
                     <img
                       src="/src/assets/images/kaaba_card_1786469865142.jpg"
                       alt="Umrah Group Packages"
-                      className="h-32 w-full object-cover rounded-lg group-hover:scale-105 transition-all duration-300 shadow-md"
+                      className="h-28 w-full object-cover rounded-lg group-hover:scale-105 transition-all duration-300 shadow-md"
                       referrerPolicy="no-referrer"
                     />
                   </div>
 
-                  <div className="p-6">
+                  <div className="p-5">
                     <button
                       onClick={() => setActiveTab("umrah")}
-                      className="w-full bg-white hover:bg-gray-50 text-[#EA580C] font-bold py-3 px-4 rounded-xl text-xs transition-all duration-150 flex items-center justify-center gap-2 shadow-sm"
+                      className="w-full bg-white hover:bg-gray-50 text-[#EA580C] font-bold py-2.5 px-4 rounded-xl text-xs transition-all duration-150 flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                     >
                       <span>Click To Book Now</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Card 3: Hotel Booking (Teal / Cyan card) */}
+                <div className="bg-gradient-to-br from-[#008080] to-[#00a29c] text-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col justify-between h-[360px] group border-4 border-white">
+                  <div className="p-5 text-center">
+                    <div className="inline-flex p-2.5 bg-white/10 rounded-full mb-2">
+                      <Hotel className="h-5 w-5 text-white" />
+                    </div>
+                    <h3 className="text-xl font-black uppercase tracking-tight">Hotel Booking</h3>
+                    <p className="text-[11px] text-teal-100 mt-0.5">Reserve Makkah, Madinah & global hotels</p>
+                  </div>
+
+                  <div className="px-5 flex justify-center flex-1 items-center overflow-hidden">
+                    <div className="h-28 w-full bg-teal-900/40 rounded-lg flex flex-col items-center justify-center p-3 text-center border border-teal-300/30 group-hover:scale-105 transition-all duration-300 shadow-md">
+                      <BedDouble className="h-8 w-8 text-white mb-1.5" />
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-teal-100">
+                        Exclusive B2B Rates
+                      </span>
+                      <span className="text-[10px] text-teal-200">Makkah • Madinah • Dubai</span>
+                    </div>
+                  </div>
+
+                  <div className="p-5">
+                    <button
+                      onClick={() => setActiveTab("hotels")}
+                      className="w-full bg-white hover:bg-gray-50 text-[#008080] font-bold py-2.5 px-4 rounded-xl text-xs transition-all duration-150 flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <span>Click To Book Hotels</span>
                       <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
 
               </div>
+
             </div>
           )}
 
@@ -1128,6 +1624,7 @@ export default function AgentDashboard({
                         <th className="px-4 py-3 text-left text-xs font-bold uppercase">Passenger Details</th>
                         <th className="px-4 py-3 text-left text-xs font-bold uppercase">Required Documents</th>
                         <th className="px-4 py-3 text-left text-xs font-bold uppercase">Status</th>
+                        <th className="px-4 py-3 text-right text-xs font-bold uppercase">Ticket Invoice</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white text-xs">
@@ -1188,6 +1685,21 @@ export default function AgentDashboard({
                             </td>
                             <td className="px-4 py-3">
                               <Badge status={b.status} />
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() =>
+                                  setInvoiceModal({
+                                    isOpen: true,
+                                    booking: b,
+                                    ticket: associatedFlight,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                                <span>Ticket Invoice</span>
+                              </button>
                             </td>
                           </tr>
                         );
@@ -1425,6 +1937,134 @@ export default function AgentDashboard({
                   </p>
                 </div>
 
+                {/* 1. In-line Umrah Booking form */}
+                {selectedUmrahPkg && (
+                  <Card className="border border-[#00a29c] bg-[#00a29c]/5 p-5 mb-6 space-y-4 animate-fadeIn">
+                    <div className="flex justify-between items-center pb-3 border-b border-gray-200">
+                      <div>
+                        <h4 className="text-sm font-black text-[#133F5C]">
+                          Submit Umrah Passenger Dossier — {selectedUmrahPkg.airline}
+                        </h4>
+                        <p className="text-[11px] text-gray-500">
+                          Package Duration: {selectedUmrahPkg.days} | Cost: <span className="font-bold text-[#ff7300]">PKR {selectedUmrahPkg.price.toLocaleString()}</span>
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedUmrahPkg(null)}
+                        className="p-1 text-gray-400 hover:text-gray-600 font-bold text-sm cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    {bookingStatus && (
+                      <Alert
+                        id="umrah-agent-status"
+                        type={bookingStatus.type}
+                        message={bookingStatus.text}
+                        onClose={() => setBookingStatus(null)}
+                      />
+                    )}
+
+                    <form onSubmit={handleBookUmrahPackage} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      <div className="space-y-3">
+                        <Input
+                          id="umrah-p-name"
+                          label="Passenger Full Name (Matching Passport)"
+                          placeholder="e.g. Muhammad Ali"
+                          value={umrahPassengerName}
+                          onChange={(e) => setUmrahPassengerName(e.target.value)}
+                          required
+                          disabled={umrahBookingLoading}
+                        />
+                        <Input
+                          id="umrah-p-passport"
+                          label="Passport Number"
+                          placeholder="e.g. AB1234567"
+                          value={umrahPassengerPassport}
+                          onChange={(e) => setUmrahPassengerPassport(e.target.value)}
+                          required
+                          disabled={umrahBookingLoading}
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        {/* Passenger Photo Upload */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#133F5C] mb-1">
+                            Passenger Photo (Passport Size JPEG)
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <label className="flex-1 border border-dashed border-gray-300 rounded-lg p-2 bg-white flex items-center justify-center gap-2 cursor-pointer hover:border-[#00a29c]">
+                              <Upload className="h-3.5 w-3.5 text-gray-400" />
+                              <span className="text-[11px] text-gray-500 font-bold truncate">
+                                {umrahPassengerPhotoName || "Choose JPG"}
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/jpg"
+                                onChange={handleUmrahPassengerPhotoChange}
+                                className="hidden"
+                                required
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Passport Photo Upload */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#133F5C] mb-1">
+                            Passport Scan (JPEG)
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <label className="flex-1 border border-dashed border-gray-300 rounded-lg p-2 bg-white flex items-center justify-center gap-2 cursor-pointer hover:border-[#00a29c]">
+                              <Upload className="h-3.5 w-3.5 text-gray-400" />
+                              <span className="text-[11px] text-gray-500 font-bold truncate">
+                                {umrahPassportPhotoName || "Choose JPG"}
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/jpg"
+                                onChange={handleUmrahPassportPhotoChange}
+                                className="hidden"
+                                required
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-2 flex justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUmrahPkg(null)}
+                          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={umrahBookingLoading}
+                          className="bg-[#ff7300] hover:bg-[#e05e00] text-white font-black px-6 py-2 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          {umrahBookingLoading ? (
+                            <>
+                              <LoadingSpinner size="sm" />
+                              Booking Tour...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-4 w-4" />
+                              Deduct & Confirm Booking
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </Card>
+                )}
+
+                {/* Umrah Packages list */}
                 <div className="space-y-6 max-w-4xl">
                   {umrahPackages.map((pkg) => (
                     <div
@@ -1438,31 +2078,40 @@ export default function AgentDashboard({
                             SAUDIA / JINNAH
                           </div>
                           <p className="text-xs font-black text-[#133F5C] leading-none">{pkg.airline}</p>
-                          <span className="inline-block bg-cyan-50 text-[#00a29c] text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          <span className="inline-block bg-cyan-50 text-[#00a29c] text-[10px] font-bold px-2 py-0.5 rounded-full mt-1">
                             {pkg.days} Package
                           </span>
                         </div>
                       </div>
 
-                      {/* Center: Flight timelines */}
-                      <div className="flex-1 space-y-4">
-                        <div className="grid grid-cols-1 gap-3 text-xs">
-                          {/* Departure Details */}
-                          <div className="flex items-start gap-2.5">
-                            <span className="bg-[#133F5C]/10 text-[#133F5C] text-[10px] font-bold px-2 py-0.5 rounded font-mono shrink-0">DEP</span>
-                            <div className="space-y-0.5">
-                              <p className="font-bold text-gray-800">{pkg.depDetails}</p>
-                              <p className="text-[10px] text-gray-400 font-mono">Flight No: {pkg.flightNoDep}</p>
+                      {/* Center: Flight & Hotel inclusions */}
+                      <div className="flex-1 space-y-4 text-xs">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            {/* Departure Details */}
+                            <div className="flex items-start gap-2.5">
+                              <span className="bg-[#133F5C]/10 text-[#133F5C] text-[10px] font-bold px-2 py-0.5 rounded font-mono shrink-0">DEP</span>
+                              <div className="space-y-0.5">
+                                <p className="font-bold text-gray-800">{pkg.depDetails || "ISB/LHE → JED"}</p>
+                                <p className="text-[10px] text-gray-400 font-mono">Flight No: {pkg.flightNoDep}</p>
+                              </div>
+                            </div>
+
+                            {/* Return Details */}
+                            <div className="flex items-start gap-2.5">
+                              <span className="bg-[#ff7300]/10 text-[#ff7300] text-[10px] font-bold px-2 py-0.5 rounded font-mono shrink-0">RET</span>
+                              <div className="space-y-0.5">
+                                <p className="font-bold text-gray-800">{pkg.retDetails || "JED → ISB/LHE"}</p>
+                                <p className="text-[10px] text-gray-400 font-mono">Flight No: {pkg.flightNoRet}</p>
+                              </div>
                             </div>
                           </div>
 
-                          {/* Return Details */}
-                          <div className="flex items-start gap-2.5">
-                            <span className="bg-[#ff7300]/10 text-[#ff7300] text-[10px] font-bold px-2 py-0.5 rounded font-mono shrink-0">RET</span>
-                            <div className="space-y-0.5">
-                              <p className="font-bold text-gray-800">{pkg.retDetails}</p>
-                              <p className="text-[10px] text-gray-400 font-mono">Flight No: {pkg.flightNoRet}</p>
-                            </div>
+                          <div className="space-y-1 bg-gray-50 p-3 rounded-xl border border-gray-100 text-[11px] text-gray-600">
+                            <p className="font-bold text-[#133F5C] pb-1 border-b border-gray-200 mb-1">Standard Premium Inclusions</p>
+                            <p>🏨 <strong>Makkah:</strong> {pkg.hotelMakkah || "Swissôtel Makkah"}</p>
+                            <p>🏨 <strong>Madinah:</strong> {pkg.hotelMadinah || "Pullman Zamzam Madina"}</p>
+                            <p>💺 <strong>Live Seats:</strong> <span className="font-black text-[#00a29c]">{pkg.availableSeats}</span> / {pkg.totalSeats || 50} remaining</p>
                           </div>
                         </div>
 
@@ -1483,17 +2132,13 @@ export default function AgentDashboard({
 
                         <button
                           onClick={() => {
-                            // Find corresponding flight if existing, or load interactive dossier
-                            setActiveTab("book_tickets");
-                            // Select any ticket or notify agent
-                            setBookingStatus({
-                              type: "info",
-                              text: `Choose an active ticket slot under "Book Tickets" to complete the Umrah boarding list for ${pkg.airline}.`,
-                            });
+                            setSelectedUmrahPkg(pkg);
+                            setBookingStatus(null);
                           }}
-                          className="bg-[#ff7300] hover:bg-[#e05e00] text-white font-black text-xs py-2 px-5 rounded-lg w-full md:w-auto transition-all cursor-pointer"
+                          disabled={pkg.availableSeats <= 0}
+                          className="mt-4 bg-[#00a29c] hover:bg-[#00827d] disabled:bg-gray-200 disabled:text-gray-400 text-white font-black text-xs py-2 px-5 rounded-lg w-full md:w-auto transition-all cursor-pointer text-center"
                         >
-                          Show Details
+                          {pkg.availableSeats <= 0 ? "Fully Booked" : "Book Tour"}
                         </button>
                       </div>
 
@@ -1501,6 +2146,481 @@ export default function AgentDashboard({
                   ))}
                 </div>
 
+                {/* 2. My Agency Umrah Bookings Table */}
+                <div className="mt-8 pt-6 border-t border-gray-100">
+                  <div className="pb-4">
+                    <h4 className="text-sm font-black text-[#133F5C]">My Agency Umrah Bookings ({myUmrahBookings.length})</h4>
+                    <p className="text-[11px] text-gray-500">Track real-time status of passenger Visas, airline tickets, and hotels verified by admin.</p>
+                  </div>
+
+                  {myUmrahBookings.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-xs">
+                      Your agency hasn't booked any Umrah packages yet. Click "Book Tour" on any catalog entry above to submit your first passenger.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-xs">
+                        <thead>
+                          <tr className="bg-gray-50 text-gray-500 font-bold uppercase">
+                            <th className="px-4 py-3 text-left">Ref ID</th>
+                            <th className="px-4 py-3 text-left">Umrah Package</th>
+                            <th className="px-4 py-3 text-left">Passenger Details</th>
+                            <th className="px-4 py-3 text-left">Uploaded Documents</th>
+                            <th className="px-4 py-3 text-left">Booking Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {myUmrahBookings.map((b) => {
+                            const p = umrahPackages.find((pkg) => pkg.id === b.packageId);
+                            return (
+                              <tr key={b.bookingId} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-mono font-bold text-gray-500">
+                                  #{b.bookingId.substring(0, 8)}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="font-bold text-gray-800">
+                                    {p ? `${p.airline} (${p.days})` : "Syncing..."}
+                                  </div>
+                                  <div className="text-[10px] text-gray-500 font-mono">
+                                    Flight: {p?.flightNoDep} / Price: PKR {p?.price.toLocaleString()}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="font-bold text-gray-800">{b.passengerName}</div>
+                                  <div className="text-[10px] text-gray-500 font-mono font-bold">Passport: {b.passengerPassport}</div>
+                                </td>
+                                <td className="px-4 py-3 space-x-2">
+                                  {b.passengerPhotoUrl ? (
+                                    <button
+                                      onClick={() =>
+                                        setPhotoModal({
+                                          isOpen: true,
+                                          title: `Passenger Photo: ${b.passengerName}`,
+                                          imgUrl: b.passengerPhotoUrl,
+                                        })
+                                      }
+                                      className="text-[10px] text-[#00a29c] font-bold bg-cyan-50 hover:bg-cyan-100 px-2 py-0.5 rounded cursor-pointer"
+                                    >
+                                      Photo
+                                    </button>
+                                  ) : (
+                                    <span className="text-gray-400">No Photo</span>
+                                  )}
+                                  {b.passportPhotoUrl ? (
+                                    <button
+                                      onClick={() =>
+                                        setPhotoModal({
+                                          isOpen: true,
+                                          title: `Passport Scan: ${b.passengerName}`,
+                                          imgUrl: b.passportPhotoUrl,
+                                        })
+                                      }
+                                      className="text-[10px] text-blue-600 font-bold bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded cursor-pointer"
+                                    >
+                                      Passport
+                                    </button>
+                                  ) : (
+                                    <span className="text-gray-400">No Passport</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <Badge status={b.status} />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
+          {/* 8. HOTEL BOOKING TAB VIEW */}
+          {activeTab === "hotels" && (
+            <div className="space-y-6">
+              
+              {/* Header with City Filter */}
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h2 className="text-lg font-black text-[#133F5C] flex items-center gap-2">
+                    <Hotel className="h-5 w-5 text-[#00a29c]" /> B2B Hotel Reservations
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Browse published hotels in Makkah, Madinah, and worldwide with instant B2B ledger confirmation.
+                  </p>
+                </div>
+
+                {/* City Filter Pills */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {["All", "Makkah", "Madinah", "Jeddah", "Riyadh", "Dubai"].map((city) => (
+                    <button
+                      key={city}
+                      onClick={() => setSelectedCityFilter(city)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        selectedCityFilter === city
+                          ? "bg-[#00a29c] text-white shadow-xs"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status alerts */}
+              {hotelStatusMsg && (
+                <Alert
+                  id="agent-hotel-status"
+                  type={hotelStatusMsg.type}
+                  message={hotelStatusMsg.text}
+                  onClose={() => setHotelStatusMsg(null)}
+                />
+              )}
+
+              {/* Published Hotels Grid */}
+              <div>
+                <h3 className="text-xs font-black text-[#133F5C] uppercase tracking-wider mb-3">
+                  Available Hotels ({selectedCityFilter === "All" ? hotels.length : hotels.filter(h => h.city.toLowerCase() === selectedCityFilter.toLowerCase()).length})
+                </h3>
+
+                {loadingHotels ? (
+                  <div className="flex justify-center p-12 bg-white rounded-xl border border-gray-200">
+                    <LoadingSpinner />
+                  </div>
+                ) : hotels.length === 0 ? (
+                  <Card className="p-8 text-center text-gray-400 text-xs">
+                    No hotel listings published yet by Admin.
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {hotels
+                      .filter((h) => selectedCityFilter === "All" || h.city.toLowerCase() === selectedCityFilter.toLowerCase())
+                      .map((h) => (
+                        <div
+                          key={h.id}
+                          className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                        >
+                          <div>
+                            {/* Card Top Banner / Image */}
+                            <div className="h-36 bg-gradient-to-r from-[#133F5C] to-[#00a29c] p-4 text-white relative flex flex-col justify-between">
+                              {h.imageUrl ? (
+                                <img
+                                  src={h.imageUrl}
+                                  alt={h.name}
+                                  className="absolute inset-0 w-full h-full object-cover opacity-60"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : null}
+                              <div className="relative z-10 flex justify-between items-start">
+                                <span className="bg-[#ff7300] text-white text-[10px] font-black px-2 py-0.5 rounded shadow-xs">
+                                  {h.city}
+                                </span>
+                                <span className="bg-black/60 backdrop-blur-xs text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+                                  <Star className="h-3 w-3 fill-amber-300" /> {h.stars} Stars
+                                </span>
+                              </div>
+
+                              <div className="relative z-10">
+                                <h4 className="font-extrabold text-base leading-tight drop-shadow-sm">{h.name}</h4>
+                                <p className="text-[11px] text-gray-200 flex items-center gap-1 mt-0.5">
+                                  <MapPin className="h-3 w-3 text-cyan-300 shrink-0" />
+                                  <span className="truncate">{h.distanceToHaram || "Prime Location"}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Details Body */}
+                            <div className="p-4 space-y-2.5 text-xs text-gray-600">
+                              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                <span className="text-gray-500 font-medium flex items-center gap-1">
+                                  <BedDouble className="h-3.5 w-3.5 text-[#00a29c]" /> Room Types:
+                                </span>
+                                <span className="font-bold text-gray-800">{h.roomTypes || "Sharing Rooms"}</span>
+                              </div>
+
+                              {h.amenities && (
+                                <p className="text-[11px] text-gray-500 bg-gray-50 p-2 rounded-lg font-mono">
+                                  ✓ {h.amenities}
+                                </p>
+                              )}
+
+                              <div className="flex justify-between items-center pt-1">
+                                <div>
+                                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Rate Per Night</span>
+                                  <span className="text-base font-black text-[#ff7300]">
+                                    PKR {h.pricePerNight.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Status</span>
+                                  <span className={`text-xs font-bold ${h.availableRooms > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                    {h.availableRooms > 0 ? `${h.availableRooms} Rooms Avail` : "Sold Out"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          <div className="p-4 pt-0">
+                            <button
+                              onClick={() => {
+                                setSelectedHotel(h);
+                                setHotelStatusMsg(null);
+                              }}
+                              disabled={h.availableRooms <= 0}
+                              className={`w-full py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                h.availableRooms > 0
+                                  ? "bg-[#ff7300] hover:bg-[#e05e00] text-white shadow-xs"
+                                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                              }`}
+                            >
+                              <Hotel className="h-4 w-4" />
+                              <span>{h.availableRooms > 0 ? "Book This Hotel" : "Fully Booked"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* HOTEL BOOKING FORM MODAL */}
+              {selectedHotel && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+                  <div className="relative bg-white rounded-2xl max-w-lg w-full p-6 border border-gray-200 shadow-2xl my-8">
+                    <div className="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+                      <div>
+                        <span className="text-[10px] bg-[#133F5C] text-white font-bold px-2 py-0.5 rounded uppercase">
+                          {selectedHotel.city}
+                        </span>
+                        <h3 className="text-base font-black text-[#133F5C] mt-1">{selectedHotel.name}</h3>
+                        <p className="text-xs text-gray-500">PKR {selectedHotel.pricePerNight.toLocaleString()} / night</p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedHotel(null)}
+                        className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleBookHotel} className="space-y-4 text-xs">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-[#133F5C] mb-1">Check-In Date *</label>
+                          <input
+                            type="date"
+                            value={checkInDate}
+                            onChange={(e) => setCheckInDate(e.target.value)}
+                            required
+                            className="w-full border border-gray-300 rounded-lg p-2 text-xs bg-white text-gray-800 font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-[#133F5C] mb-1">Check-Out Date *</label>
+                          <input
+                            type="date"
+                            value={checkOutDate}
+                            onChange={(e) => setCheckOutDate(e.target.value)}
+                            required
+                            className="w-full border border-gray-300 rounded-lg p-2 text-xs bg-white text-gray-800 font-medium"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-[#133F5C] mb-1">Room Sharing Type *</label>
+                          <select
+                            value={roomType}
+                            onChange={(e) => setRoomType(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-xs bg-white text-gray-800 font-bold"
+                          >
+                            <option value="Quad Sharing Room">Quad Sharing Room</option>
+                            <option value="Triple Sharing Room">Triple Sharing Room</option>
+                            <option value="Double Sharing Room">Double Sharing Room</option>
+                            <option value="Single Private Room">Single Private Room</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-[#133F5C] mb-1">Number of Rooms *</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max={selectedHotel.availableRooms}
+                            value={numberOfRooms}
+                            onChange={(e) => setNumberOfRooms(Math.max(1, Number(e.target.value)))}
+                            required
+                            className="w-full border border-gray-300 rounded-lg p-2 text-xs bg-white text-gray-800 font-bold"
+                          />
+                        </div>
+                      </div>
+
+                      <Input
+                        id="guest-name"
+                        label="Primary Guest Name *"
+                        placeholder="e.g. Muhammad Ali"
+                        value={guestName}
+                        onChange={(e) => setGuestName(e.target.value)}
+                        required
+                        disabled={hotelBookingLoading}
+                      />
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          id="guest-phone"
+                          label="Contact Phone *"
+                          placeholder="e.g. +92 300 1234567"
+                          value={guestPhone}
+                          onChange={(e) => setGuestPhone(e.target.value)}
+                          required
+                          disabled={hotelBookingLoading}
+                        />
+                        <Input
+                          id="guest-passport"
+                          label="Passport Number *"
+                          placeholder="e.g. AB1234567"
+                          value={guestPassport}
+                          onChange={(e) => setGuestPassport(e.target.value)}
+                          required
+                          disabled={hotelBookingLoading}
+                        />
+                      </div>
+
+                      {/* Summary Calculation */}
+                      {checkInDate && checkOutDate && (
+                        <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-3.5 space-y-1.5 text-xs text-[#133F5C]">
+                          <div className="flex justify-between">
+                            <span>Nights Stay:</span>
+                            <span className="font-bold">
+                              {Math.max(1, Math.ceil((new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / (1000 * 60 * 60 * 24)))} Night(s)
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Rooms:</span>
+                            <span className="font-bold">{numberOfRooms} Room(s)</span>
+                          </div>
+                          <div className="flex justify-between border-t border-cyan-200 pt-1.5 text-sm font-black text-[#ff7300]">
+                            <span>Total Booking Amount:</span>
+                            <span>
+                              PKR {(
+                                selectedHotel.pricePerNight *
+                                Math.max(1, Math.ceil((new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / (1000 * 60 * 60 * 24))) *
+                                numberOfRooms
+                              ).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-gray-500 font-mono pt-1">
+                            Current Ledger Credit: PKR {currentBalance.toLocaleString()}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          type="submit"
+                          disabled={hotelBookingLoading}
+                          className="flex-1 bg-[#ff7300] hover:bg-[#e05e00] text-white font-bold py-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                        >
+                          {hotelBookingLoading ? <LoadingSpinner size="sm" /> : "Confirm Hotel Reservation"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedHotel(null)}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-3 rounded-lg text-xs cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* My Hotel Bookings Table */}
+              <div className="space-y-4 pt-4">
+                <h3 className="text-xs font-black text-[#133F5C] uppercase tracking-wider">
+                  My Hotel Bookings Log ({myHotelBookings.length})
+                </h3>
+
+                {myHotelBookings.length === 0 ? (
+                  <Card className="p-8 text-center text-gray-400 text-xs">
+                    You have not reserved any hotel rooms yet.
+                  </Card>
+                ) : (
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-xs">
+                    <table className="min-w-full divide-y divide-gray-200 text-xs">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-500 font-bold uppercase">
+                          <th className="px-4 py-3 text-left">Ref ID</th>
+                          <th className="px-4 py-3 text-left">Hotel & City</th>
+                          <th className="px-4 py-3 text-left">Guest Name</th>
+                          <th className="px-4 py-3 text-left">Dates</th>
+                          <th className="px-4 py-3 text-left">Rooms & Cost</th>
+                          <th className="px-4 py-3 text-left">Status</th>
+                          <th className="px-4 py-3 text-right">Voucher</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {myHotelBookings.map((hb) => {
+                          const matchingHotel = hotels.find((h) => h.id === hb.hotelId);
+                          return (
+                            <tr key={hb.bookingId} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-mono font-bold text-gray-500">
+                                #{hb.bookingId.substring(0, 8)}
+                              </td>
+                              <td className="px-4 py-3 font-bold text-gray-800">
+                                <div>{hb.hotelName}</div>
+                                <div className="text-[10px] text-[#00a29c]">{hb.city}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-bold text-gray-800">{hb.guestName}</div>
+                                <div className="text-[10px] text-gray-500 font-mono">Passport: {hb.passportNo}</div>
+                              </td>
+                              <td className="px-4 py-3 text-[11px]">
+                                <div>In: {hb.checkInDate}</div>
+                                <div>Out: {hb.checkOutDate}</div>
+                                <div className="text-[10px] text-gray-400 font-bold">{hb.nights} Night(s)</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-black text-[#ff7300]">
+                                  PKR {hb.totalCost ? hb.totalCost.toLocaleString() : "0"}
+                                </div>
+                                <div className="text-[10px] text-gray-500">{hb.numberOfRooms} Room(s)</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <Badge status={hb.status} />
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  onClick={() =>
+                                    setVoucherModal({
+                                      isOpen: true,
+                                      booking: hb,
+                                      hotel: matchingHotel,
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#5da855] hover:bg-[#4d8f45] text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  <span>Hotel Voucher</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
             </div>
@@ -1508,6 +2628,7 @@ export default function AgentDashboard({
 
         </div>
       </main>
+
 
       {/* DOCUMENT VIEW PREVIEW MODAL */}
       {photoModal.isOpen && (
@@ -1543,6 +2664,22 @@ export default function AgentDashboard({
           </div>
         </div>
       )}
+
+      {/* TICKET INVOICE MODAL */}
+      <TicketInvoiceModal
+        isOpen={invoiceModal.isOpen}
+        onClose={() => setInvoiceModal({ isOpen: false, booking: null, ticket: null })}
+        booking={invoiceModal.booking}
+        ticket={invoiceModal.ticket}
+      />
+
+      {/* HOTEL VOUCHER MODAL */}
+      <HotelVoucherModal
+        isOpen={voucherModal.isOpen}
+        onClose={() => setVoucherModal({ isOpen: false, booking: null, hotel: null })}
+        booking={voucherModal.booking}
+        hotel={voucherModal.hotel}
+      />
 
     </div>
   );

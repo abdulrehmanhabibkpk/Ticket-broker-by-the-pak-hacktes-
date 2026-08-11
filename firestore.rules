@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == "abdulrehman654as@gmail.com";
+    }
+
+    function isAgent() {
+      return isSignedIn() && isEmailVerified();
+    }
+
+    // Tickets (Flights)
+    match /tickets/{ticketId} {
+      allow read: if isAgent() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Bookings (Passenger dossiers)
+    match /bookings/{bookingId} {
+      allow read: if isAdmin() || (isAgent() && existing().agentEmail == request.auth.token.email);
+      allow create: if (isAgent() || isAdmin()) && incoming().agentEmail == request.auth.token.email;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Ledgers (Agent account balance)
+    match /ledgers/{ledgerId} {
+      allow read: if isAdmin() || (isAgent() && existing().agentEmail == request.auth.token.email);
+      allow create: if (isAgent() || isAdmin()) && incoming().agentEmail == request.auth.token.email;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Notifications (Broadcast alerts)
+    match /notifications/{notificationId} {
+      allow read: if isAgent() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Umrah Group Packages
+    match /umrah_packages/{packageId} {
+      allow read: if isAgent() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Umrah Bookings
+    match /umrah_bookings/{bookingId} {
+      allow read: if isAdmin() || (isAgent() && existing().agentEmail == request.auth.token.email);
+      allow create: if (isAgent() || isAdmin()) && incoming().agentEmail == request.auth.token.email;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Hotels Inventory
+    match /hotels/{hotelId} {
+      allow read: if isAgent() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Hotel Bookings
+    match /hotel_bookings/{bookingId} {
+      allow read: if isAdmin() || (isAgent() && existing().agentEmail == request.auth.token.email);
+      allow create: if (isAgent() || isAdmin()) && incoming().agentEmail == request.auth.token.email;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}

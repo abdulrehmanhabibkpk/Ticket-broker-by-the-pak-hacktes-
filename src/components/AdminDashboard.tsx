@@ -11,8 +11,10 @@ import {
   orderBy,
   getDocs
 } from "firebase/firestore";
-import { Ticket, Booking, LedgerTransaction, SystemNotification } from "../types";
+import { Ticket, Booking, LedgerTransaction, SystemNotification, UmrahPackage, UmrahBooking, HotelListing, HotelBooking } from "../types";
 import { Button, Input, Card, Badge, LoadingSpinner, Alert } from "./UIComponents";
+import { TicketInvoiceModal } from "./TicketInvoiceModal";
+import { HotelVoucherModal } from "./HotelVoucherModal";
 import {
   Plane,
   Plus,
@@ -33,11 +35,16 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   ChevronRight,
-  Building
+  Building,
+  Sparkles,
+  Hotel,
+  BedDouble,
+  MapPin,
+  Star
 } from "lucide-react";
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
-  // Navigation: 'inventory' | 'bookings' | 'ledger' | 'notifications'
+  // Navigation: 'inventory' | 'bookings' | 'ledger' | 'notifications' | 'umrah_inventory' | 'umrah_bookings' | 'hotel_inventory' | 'hotel_bookings'
   const [activeTab, setActiveTab] = useState<string>("inventory");
   
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -48,6 +55,55 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [loadingTickets, setLoadingTickets] = useState(true);
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [loadingLedgers, setLoadingLedgers] = useState(true);
+
+  // Umrah Packages and Bookings state
+  const [umrahPackages, setUmrahPackages] = useState<UmrahPackage[]>([]);
+  const [umrahBookings, setUmrahBookings] = useState<UmrahBooking[]>([]);
+  const [loadingUmrahPackages, setLoadingUmrahPackages] = useState(true);
+  const [loadingUmrahBookings, setLoadingUmrahBookings] = useState(true);
+
+  // Hotel Listings and Bookings state
+  const [hotels, setHotels] = useState<HotelListing[]>([]);
+  const [hotelBookings, setHotelBookings] = useState<HotelBooking[]>([]);
+  const [loadingHotels, setLoadingHotels] = useState(true);
+  const [loadingHotelBookings, setLoadingHotelBookings] = useState(true);
+
+  // Form State for Adding / Editing Hotels
+  const [isEditingHotel, setIsEditingHotel] = useState(false);
+  const [editHotelId, setEditHotelId] = useState<string | null>(null);
+  const [hotelName, setHotelName] = useState("");
+  const [hotelCity, setHotelCity] = useState("Makkah");
+  const [hotelStars, setHotelStars] = useState("5");
+  const [hotelDistance, setHotelDistance] = useState("");
+  const [hotelRoomTypes, setHotelRoomTypes] = useState("Quad / Triple / Double Sharing");
+  const [hotelPricePerNight, setHotelPricePerNight] = useState("");
+  const [hotelTotalRooms, setHotelTotalRooms] = useState("");
+  const [hotelAvailableRooms, setHotelAvailableRooms] = useState("");
+  const [hotelAmenities, setHotelAmenities] = useState("Free WiFi, Air Conditioning, Haram Shuttle Service");
+  const [hotelDescription, setHotelDescription] = useState("");
+  const [hotelImageUrl, setHotelImageUrl] = useState("");
+  const [hotelSubmitting, setHotelSubmitting] = useState(false);
+  const [hotelError, setHotelError] = useState("");
+  const [hotelSuccess, setHotelSuccess] = useState("");
+
+  // Form State for Adding / Editing Umrah Packages
+  const [isEditingUmrah, setIsEditingUmrah] = useState(false);
+  const [editUmrahId, setEditUmrahId] = useState<string | null>(null);
+  const [umrahDays, setUmrahDays] = useState("");
+  const [umrahAirline, setUmrahAirline] = useState("");
+  const [umrahFlightNoDep, setUmrahFlightNoDep] = useState("");
+  const [umrahFlightNoRet, setUmrahFlightNoRet] = useState("");
+  const [umrahDepDetails, setUmrahDepDetails] = useState("");
+  const [umrahRetDetails, setUmrahRetDetails] = useState("");
+  const [umrahBaggage, setUmrahBaggage] = useState("");
+  const [umrahPrice, setUmrahPrice] = useState("");
+  const [umrahHotelMakkah, setUmrahHotelMakkah] = useState("");
+  const [umrahHotelMadinah, setUmrahHotelMadinah] = useState("");
+  const [umrahTotalSeats, setUmrahTotalSeats] = useState("");
+  const [umrahAvailableSeats, setUmrahAvailableSeats] = useState("");
+  const [umrahSubmitting, setUmrahSubmitting] = useState(false);
+  const [umrahError, setUmrahError] = useState("");
+  const [umrahSuccess, setUmrahSuccess] = useState("");
 
   // Form State for Adding / Editing Tickets (Flight schedules)
   const [isEditing, setIsEditing] = useState(false);
@@ -87,6 +143,20 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     title: string;
     imgUrl: string;
   }>({ isOpen: false, title: "", imgUrl: "" });
+
+  // Ticket Invoice modal state
+  const [invoiceModal, setInvoiceModal] = useState<{
+    isOpen: boolean;
+    booking: Booking | null;
+    ticket?: Ticket | null;
+  }>({ isOpen: false, booking: null, ticket: null });
+
+  // Hotel Voucher modal state
+  const [voucherModal, setVoucherModal] = useState<{
+    isOpen: boolean;
+    booking: HotelBooking | null;
+    hotel?: HotelListing | null;
+  }>({ isOpen: false, booking: null, hotel: null });
 
   // 1. Listen to Tickets real-time
   useEffect(() => {
@@ -204,6 +274,217 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       },
       (error) => {
         console.error("Error listening to notifications:", error);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  // 5. Listen to Umrah packages real-time
+  useEffect(() => {
+    const q = query(collection(db, "umrah_packages"));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (snapshot.empty) {
+          // Auto seed default Umrah packages if Firestore is empty
+          addDoc(collection(db, "umrah_packages"), {
+            days: "15 Days Executive Umrah Package",
+            airline: "PIA (Pakistan International Airlines)",
+            flightNoDep: "PK-739",
+            flightNoRet: "PK-740",
+            depDetails: "LHE 08:30 -> JED 12:15",
+            retDetails: "MED 15:45 -> LHE 22:30",
+            baggage: "2 Pieces (23kg) + 7kg Hand",
+            price: 245000,
+            hotelMakkah: "Swissôtel Makkah (5 Star)",
+            hotelMadinah: "Pullman Zamzam Madinah (5 Star)",
+            totalSeats: 30,
+            availableSeats: 22,
+            timestamp: new Date(),
+          }).catch(console.error);
+
+          addDoc(collection(db, "umrah_packages"), {
+            days: "21 Days Economy Sharing Package",
+            airline: "Airblue",
+            flightNoDep: "PA-270",
+            flightNoRet: "PA-271",
+            depDetails: "KHI 14:00 -> JED 17:30",
+            retDetails: "JED 20:00 -> KHI 02:15",
+            baggage: "30kg Check-in + 7kg Carry-on",
+            price: 195000,
+            hotelMakkah: "Anjum Hotel Makkah (5 Star)",
+            hotelMadinah: "Grand Plaza Madinah (4 Star)",
+            totalSeats: 40,
+            availableSeats: 35,
+            timestamp: new Date(),
+          }).catch(console.error);
+        }
+
+        const pkgsList: UmrahPackage[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          pkgsList.push({
+            id: docSnap.id,
+            days: data.days || "",
+            airline: data.airline || "",
+            flightNoDep: data.flightNoDep || "",
+            flightNoRet: data.flightNoRet || "",
+            depDetails: data.depDetails || "",
+            retDetails: data.retDetails || "",
+            baggage: data.baggage || "",
+            price: Number(data.price) || 0,
+            hotelMakkah: data.hotelMakkah || "",
+            hotelMadinah: data.hotelMadinah || "",
+            totalSeats: Number(data.totalSeats) || 0,
+            availableSeats: data.availableSeats !== undefined ? Number(data.availableSeats) : (Number(data.totalSeats) || 0),
+          });
+        });
+        setUmrahPackages(pkgsList);
+        setLoadingUmrahPackages(false);
+      },
+      (error) => {
+        console.error("Error listening to Umrah packages:", error);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  // 6. Listen to Umrah bookings real-time
+  useEffect(() => {
+    const q = query(collection(db, "umrah_bookings"));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const bookingsList: UmrahBooking[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          bookingsList.push({
+            bookingId: docSnap.id,
+            packageId: data.packageId || "",
+            agentName: data.agentName || "",
+            agentEmail: data.agentEmail || "",
+            passengerName: data.passengerName || "",
+            passengerPassport: data.passengerPassport || "",
+            passengerPhotoUrl: data.passengerPhotoUrl || "",
+            passportPhotoUrl: data.passportPhotoUrl || "",
+            status: data.status || "Pending",
+            timestamp: data.timestamp,
+          });
+        });
+        setUmrahBookings(bookingsList);
+        setLoadingUmrahBookings(false);
+      },
+      (error) => {
+        console.error("Error listening to Umrah bookings:", error);
+        setLoadingUmrahBookings(false);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  // 7. Listen to Hotel Listings real-time
+  useEffect(() => {
+    const q = query(collection(db, "hotels"));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (snapshot.empty) {
+          // Auto seed sample hotels if Firestore collection is empty
+          addDoc(collection(db, "hotels"), {
+            name: "Swissôtel Makkah",
+            city: "Makkah",
+            stars: 5,
+            distanceToHaram: "100 meters from King Abdulaziz Gate",
+            roomTypes: "Quad / Triple / Double Sharing",
+            pricePerNight: 28000,
+            totalRooms: 25,
+            availableRooms: 20,
+            amenities: "Free WiFi, Breakfast Buffet, Haram Shuttle Service, Air Conditioning",
+            description: "Luxury 5-star hotel facing the Holy Kaaba.",
+            imageUrl: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
+            timestamp: new Date(),
+          }).catch(console.error);
+
+          addDoc(collection(db, "hotels"), {
+            name: "Pullman Zamzam Madinah",
+            city: "Madinah",
+            stars: 5,
+            distanceToHaram: "150 meters from Al-Masjid an-Nabawi",
+            roomTypes: "Quad / Triple / Double Sharing",
+            pricePerNight: 24000,
+            totalRooms: 20,
+            availableRooms: 18,
+            amenities: "Free WiFi, Restaurant, Room Service, Air Conditioning",
+            description: "Elegant hotel located steps away from Al-Masjid an-Nabawi.",
+            imageUrl: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80",
+            timestamp: new Date(),
+          }).catch(console.error);
+        }
+
+        const hotelList: HotelListing[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          hotelList.push({
+            id: docSnap.id,
+            name: data.name || "",
+            city: data.city || "Makkah",
+            stars: Number(data.stars) || 5,
+            distanceToHaram: data.distanceToHaram || "",
+            roomTypes: data.roomTypes || "Sharing",
+            pricePerNight: Number(data.pricePerNight) || 0,
+            totalRooms: Number(data.totalRooms) || 0,
+            availableRooms: data.availableRooms !== undefined ? Number(data.availableRooms) : (Number(data.totalRooms) || 0),
+            imageUrl: data.imageUrl || "",
+            amenities: data.amenities || "",
+            description: data.description || "",
+          });
+        });
+        setHotels(hotelList);
+        setLoadingHotels(false);
+      },
+      (error) => {
+        console.error("Error listening to hotels:", error);
+        setLoadingHotels(false);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  // 8. Listen to Hotel Bookings real-time
+  useEffect(() => {
+    const q = query(collection(db, "hotel_bookings"), orderBy("timestamp", "desc"));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const bookingsList: HotelBooking[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          bookingsList.push({
+            bookingId: docSnap.id,
+            hotelId: data.hotelId || "",
+            hotelName: data.hotelName || "",
+            city: data.city || "",
+            agentName: data.agentName || "",
+            agentEmail: data.agentEmail || "",
+            guestName: data.guestName || "",
+            guestPhone: data.guestPhone || "",
+            passportNo: data.passportNo || "",
+            checkInDate: data.checkInDate || "",
+            checkOutDate: data.checkOutDate || "",
+            nights: Number(data.nights) || 1,
+            roomType: data.roomType || "",
+            numberOfRooms: Number(data.numberOfRooms) || 1,
+            totalCost: Number(data.totalCost) || 0,
+            status: data.status || "Pending",
+            timestamp: data.timestamp,
+          });
+        });
+        setHotelBookings(bookingsList);
+        setLoadingHotelBookings(false);
+      },
+      (error) => {
+        console.error("Error listening to hotel bookings:", error);
+        setLoadingHotelBookings(false);
       }
     );
     return () => unsubscribe();
@@ -431,6 +712,260 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setPnrPrefix("");
   };
 
+  // Umrah Packages CRUD Handlers
+  const handleCreateOrUpdateUmrahPackage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUmrahError("");
+    setUmrahSuccess("");
+    setUmrahSubmitting(true);
+
+    if (!umrahDays.trim() || !umrahAirline.trim() || !umrahFlightNoDep.trim() || !umrahFlightNoRet.trim()) {
+      setUmrahError("Days, Airline, and Flight numbers are required.");
+      setUmrahSubmitting(false);
+      return;
+    }
+
+    const parsedPrice = Number(umrahPrice);
+    const parsedTotalSeats = Number(umrahTotalSeats);
+    const parsedAvailableSeats = isEditingUmrah ? Number(umrahAvailableSeats) : parsedTotalSeats;
+
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      setUmrahError("Price must be a valid number greater than 0.");
+      setUmrahSubmitting(false);
+      return;
+    }
+    if (isNaN(parsedTotalSeats) || !Number.isInteger(parsedTotalSeats) || parsedTotalSeats <= 0) {
+      setUmrahError("Total seats must be a valid integer greater than 0.");
+      setUmrahSubmitting(false);
+      return;
+    }
+
+    try {
+      const packageData = {
+        days: umrahDays.trim(),
+        airline: umrahAirline.trim(),
+        flightNoDep: umrahFlightNoDep.trim().toUpperCase(),
+        flightNoRet: umrahFlightNoRet.trim().toUpperCase(),
+        depDetails: umrahDepDetails.trim(),
+        retDetails: umrahRetDetails.trim(),
+        baggage: umrahBaggage.trim(),
+        price: parsedPrice,
+        hotelMakkah: umrahHotelMakkah.trim(),
+        hotelMadinah: umrahHotelMadinah.trim(),
+        totalSeats: parsedTotalSeats,
+        availableSeats: parsedAvailableSeats,
+      };
+
+      if (isEditingUmrah && editUmrahId) {
+        const docRef = doc(db, "umrah_packages", editUmrahId);
+        await updateDoc(docRef, packageData);
+        setUmrahSuccess("Umrah package successfully updated!");
+        resetUmrahForm();
+      } else {
+        await addDoc(collection(db, "umrah_packages"), packageData);
+        setUmrahSuccess("New Umrah package successfully published!");
+        resetUmrahForm();
+      }
+    } catch (err: any) {
+      console.error("Umrah package save error:", err);
+      setUmrahError(err.message || "Failed to save Umrah package.");
+    } finally {
+      setUmrahSubmitting(false);
+    }
+  };
+
+  const handleEditUmrahClick = (pkg: UmrahPackage) => {
+    setIsEditingUmrah(true);
+    setEditUmrahId(pkg.id);
+    setUmrahDays(pkg.days);
+    setUmrahAirline(pkg.airline);
+    setUmrahFlightNoDep(pkg.flightNoDep);
+    setUmrahFlightNoRet(pkg.flightNoRet);
+    setUmrahDepDetails(pkg.depDetails);
+    setUmrahRetDetails(pkg.retDetails);
+    setUmrahBaggage(pkg.baggage);
+    setUmrahPrice(String(pkg.price));
+    setUmrahHotelMakkah(pkg.hotelMakkah);
+    setUmrahHotelMadinah(pkg.hotelMadinah);
+    setUmrahTotalSeats(String(pkg.totalSeats));
+    setUmrahAvailableSeats(String(pkg.availableSeats));
+    setUmrahError("");
+    setUmrahSuccess("");
+  };
+
+  const handleDeleteUmrahPackage = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this Umrah Group Package permanently?")) {
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, "umrah_packages", id));
+      alert("Umrah Package successfully removed!");
+    } catch (err: any) {
+      console.error("Delete Umrah package error:", err);
+      alert("Failed to delete package: " + err.message);
+    }
+  };
+
+  const handleToggleUmrahBookingStatus = async (bookingId: string, currentStatus: string) => {
+    try {
+      const nextStatus = currentStatus === "Confirmed" ? "Pending" : "Confirmed";
+      const docRef = doc(db, "umrah_bookings", bookingId);
+      await updateDoc(docRef, {
+        status: nextStatus,
+      });
+    } catch (err: any) {
+      console.error("Update status error:", err);
+      alert("Failed to update booking status: " + err.message);
+    }
+  };
+
+  const resetUmrahForm = () => {
+    setIsEditingUmrah(false);
+    setEditUmrahId(null);
+    setUmrahDays("");
+    setUmrahAirline("");
+    setUmrahFlightNoDep("");
+    setUmrahFlightNoRet("");
+    setUmrahDepDetails("");
+    setUmrahRetDetails("");
+    setUmrahBaggage("");
+    setUmrahPrice("");
+    setUmrahHotelMakkah("");
+    setUmrahHotelMadinah("");
+    setUmrahTotalSeats("");
+    setUmrahAvailableSeats("");
+  };
+
+  const handleCreateOrUpdateHotel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setHotelError("");
+    setHotelSuccess("");
+    setHotelSubmitting(true);
+
+    if (!hotelName.trim() || !hotelCity.trim()) {
+      setHotelError("Hotel Name and City are required.");
+      setHotelSubmitting(false);
+      return;
+    }
+
+    const price = Number(hotelPricePerNight);
+    const rooms = Number(hotelTotalRooms);
+    const avail = isEditingHotel ? Number(hotelAvailableRooms) : rooms;
+
+    if (isNaN(price) || price <= 0) {
+      setHotelError("Price per night must be a number greater than 0.");
+      setHotelSubmitting(false);
+      return;
+    }
+
+    if (isNaN(rooms) || rooms <= 0) {
+      setHotelError("Total rooms must be greater than 0.");
+      setHotelSubmitting(false);
+      return;
+    }
+
+    try {
+      if (isEditingHotel && editHotelId) {
+        const docRef = doc(db, "hotels", editHotelId);
+        await updateDoc(docRef, {
+          name: hotelName.trim(),
+          city: hotelCity.trim(),
+          stars: Number(hotelStars) || 5,
+          distanceToHaram: hotelDistance.trim(),
+          roomTypes: hotelRoomTypes.trim(),
+          pricePerNight: price,
+          totalRooms: rooms,
+          availableRooms: avail,
+          amenities: hotelAmenities.trim(),
+          description: hotelDescription.trim(),
+          imageUrl: hotelImageUrl.trim(),
+        });
+        setHotelSuccess("Hotel details updated successfully!");
+      } else {
+        await addDoc(collection(db, "hotels"), {
+          name: hotelName.trim(),
+          city: hotelCity.trim(),
+          stars: Number(hotelStars) || 5,
+          distanceToHaram: hotelDistance.trim(),
+          roomTypes: hotelRoomTypes.trim(),
+          pricePerNight: price,
+          totalRooms: rooms,
+          availableRooms: rooms,
+          amenities: hotelAmenities.trim(),
+          description: hotelDescription.trim(),
+          imageUrl: hotelImageUrl.trim(),
+          timestamp: new Date(),
+        });
+        setHotelSuccess("Hotel published successfully for B2B Agents!");
+      }
+      resetHotelForm();
+    } catch (err: any) {
+      console.error("Hotel submit error:", err);
+      setHotelError("Error saving hotel: " + err.message);
+    } finally {
+      setHotelSubmitting(false);
+    }
+  };
+
+  const handleEditHotelClick = (h: HotelListing) => {
+    setIsEditingHotel(true);
+    setEditHotelId(h.id);
+    setHotelName(h.name);
+    setHotelCity(h.city);
+    setHotelStars(String(h.stars));
+    setHotelDistance(h.distanceToHaram || "");
+    setHotelRoomTypes(h.roomTypes || "");
+    setHotelPricePerNight(String(h.pricePerNight));
+    setHotelTotalRooms(String(h.totalRooms));
+    setHotelAvailableRooms(String(h.availableRooms));
+    setHotelAmenities(h.amenities || "");
+    setHotelDescription(h.description || "");
+    setHotelImageUrl(h.imageUrl || "");
+    setHotelError("");
+    setHotelSuccess("");
+  };
+
+  const handleDeleteHotel = async (id: string) => {
+    if (!window.confirm("Are you sure you want to remove this hotel listing?")) {
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, "hotels", id));
+      alert("Hotel listing deleted!");
+    } catch (err: any) {
+      console.error("Delete hotel error:", err);
+      alert("Failed to delete hotel: " + err.message);
+    }
+  };
+
+  const handleToggleHotelBookingStatus = async (bookingId: string, currentStatus: string) => {
+    try {
+      const nextStatus = currentStatus === "Confirmed" ? "Pending" : "Confirmed";
+      const docRef = doc(db, "hotel_bookings", bookingId);
+      await updateDoc(docRef, { status: nextStatus });
+    } catch (err: any) {
+      console.error("Update hotel booking status error:", err);
+      alert("Failed to update status: " + err.message);
+    }
+  };
+
+  const resetHotelForm = () => {
+    setIsEditingHotel(false);
+    setEditHotelId(null);
+    setHotelName("");
+    setHotelCity("Makkah");
+    setHotelStars("5");
+    setHotelDistance("");
+    setHotelRoomTypes("Quad / Triple / Double Sharing");
+    setHotelPricePerNight("");
+    setHotelTotalRooms("");
+    setHotelAvailableRooms("");
+    setHotelAmenities("Free WiFi, Air Conditioning, Haram Shuttle Service");
+    setHotelDescription("");
+    setHotelImageUrl("");
+  };
+
+
   return (
     <div className="flex min-h-[90vh] bg-[#F1F5F9] -mx-4 sm:-mx-6 lg:-mx-8 -my-8 font-sans">
       
@@ -507,7 +1042,66 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               <Bell className="h-4 w-4" />
               <span>Broadcast Alerts</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab("umrah_inventory")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                activeTab === "umrah_inventory"
+                  ? "bg-[#00a29c] text-white shadow-xs"
+                  : "text-[#133F5C] hover:bg-gray-50"
+              }`}
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Umrah Packages</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("umrah_bookings")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                activeTab === "umrah_bookings"
+                  ? "bg-[#00a29c] text-white shadow-xs"
+                  : "text-[#133F5C] hover:bg-gray-50"
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              <span>Umrah Bookings</span>
+              {umrahBookings.length > 0 && (
+                <span className="ml-auto bg-[#ff7300] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  {umrahBookings.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab("hotel_inventory")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                activeTab === "hotel_inventory"
+                  ? "bg-[#00a29c] text-white shadow-xs"
+                  : "text-[#133F5C] hover:bg-gray-50"
+              }`}
+            >
+              <Hotel className="h-4 w-4" />
+              <span>Hotels Inventory</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("hotel_bookings")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                activeTab === "hotel_bookings"
+                  ? "bg-[#00a29c] text-white shadow-xs"
+                  : "text-[#133F5C] hover:bg-gray-50"
+              }`}
+            >
+              <BedDouble className="h-4 w-4" />
+              <span>Hotel Bookings</span>
+              {hotelBookings.length > 0 && (
+                <span className="ml-auto bg-[#ff7300] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  {hotelBookings.length}
+                </span>
+              )}
+            </button>
           </nav>
+
         </div>
 
         {/* Admin profile details bottom */}
@@ -849,17 +1443,32 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                               <Badge status={b.status} />
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <button
-                                id={`toggle-admin-btn-${b.bookingId}`}
-                                onClick={() => handleToggleBookingStatus(b.bookingId, b.status)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                                  b.status === "Confirmed"
-                                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                                    : "bg-green-600 hover:bg-green-700 text-white shadow-xs"
-                                }`}
-                              >
-                                {b.status === "Confirmed" ? "Set Pending" : "Confirm Seat"}
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() =>
+                                    setInvoiceModal({
+                                      isOpen: true,
+                                      booking: b,
+                                      ticket: associatedFlight,
+                                    })
+                                  }
+                                  className="px-2.5 py-1.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  <span>Invoice</span>
+                                </button>
+                                <button
+                                  id={`toggle-admin-btn-${b.bookingId}`}
+                                  onClick={() => handleToggleBookingStatus(b.bookingId, b.status)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                    b.status === "Confirmed"
+                                      ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                                      : "bg-green-600 hover:bg-green-700 text-white shadow-xs"
+                                  }`}
+                                >
+                                  {b.status === "Confirmed" ? "Set Pending" : "Confirm Seat"}
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1125,8 +1734,708 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           )}
 
+          {/* TAB 5: UMRAH PACKAGES INVENTORY */}
+          {activeTab === "umrah_inventory" && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-fadeIn">
+              
+              {/* Left Column: List packages */}
+              <div className="lg:col-span-8 space-y-4">
+                <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
+                  <div className="pb-4 border-b border-gray-100 mb-4">
+                    <h3 className="text-sm font-black text-[#133F5C]">Active Umrah Group Packages ({umrahPackages.length})</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Manage live available tours, flights, hotel listings, and seat inventory.</p>
+                  </div>
+
+                  {loadingUmrahPackages ? (
+                    <div className="py-12"><LoadingSpinner /></div>
+                  ) : umrahPackages.length === 0 ? (
+                    <div className="py-12 text-center text-gray-400">
+                      No Umrah packages published yet. Use the form on the right to create your first package.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {umrahPackages.map((pkg) => (
+                        <div
+                          key={pkg.id}
+                          className="border border-gray-200 rounded-xl p-4 bg-white hover:border-[#00a29c] transition-all flex flex-col md:flex-row justify-between gap-4"
+                        >
+                          <div className="flex-1 space-y-3 text-xs">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="text-sm font-black text-[#133F5C]">{pkg.airline}</h4>
+                                <span className="inline-block bg-cyan-50 text-[#00a29c] text-[10px] font-bold px-2 py-0.5 rounded-full mt-1">
+                                  {pkg.days} Package
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[10px] text-gray-400 font-bold block">Package Price</span>
+                                <span className="text-sm font-black text-[#ff7300]">PKR {pkg.price.toLocaleString()}</span>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 p-2.5 rounded-lg text-[11px] text-gray-600">
+                              <div>
+                                <p><strong>Makkah Hotel:</strong> {pkg.hotelMakkah || "Not Specified"}</p>
+                                <p><strong>Madinah Hotel:</strong> {pkg.hotelMadinah || "Not Specified"}</p>
+                                <p><strong>Baggage:</strong> {pkg.baggage || "Standard"}</p>
+                              </div>
+                              <div>
+                                <p><strong>Dep Flight:</strong> {pkg.flightNoDep} ({pkg.depDetails})</p>
+                                <p><strong>Ret Flight:</strong> {pkg.flightNoRet} ({pkg.retDetails})</p>
+                                <p><strong>Seats Available:</strong> <span className="font-bold text-[#00a29c]">{pkg.availableSeats}</span> / {pkg.totalSeats}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex md:flex-col justify-end items-end gap-2 shrink-0 md:border-l md:border-gray-100 md:pl-4">
+                            <button
+                              onClick={() => handleEditUmrahClick(pkg)}
+                              className="px-3 py-1.5 text-xs text-[#00a29c] bg-cyan-50 hover:bg-cyan-100 rounded-md font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUmrahPackage(pkg.id)}
+                              className="px-3 py-1.5 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded-md font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Form */}
+              <div className="lg:col-span-4 sticky top-6">
+                <Card className="border border-gray-200 shadow-sm p-5 space-y-4 bg-white">
+                  <h3 className="text-sm font-black text-[#133F5C] pb-2 border-b border-gray-100 flex items-center gap-2">
+                    <Sparkles className="h-4.5 w-4.5 text-[#ff7300]" />
+                    {isEditingUmrah ? "Edit Umrah Package" : "Publish Umrah Package"}
+                  </h3>
+
+                  {umrahError && <Alert id="umrah-error" type="error" message={umrahError} onClose={() => setUmrahError("")} />}
+                  {umrahSuccess && <Alert id="umrah-success" type="success" message={umrahSuccess} onClose={() => setUmrahSuccess("")} />}
+
+                  <form onSubmit={handleCreateOrUpdateUmrahPackage} className="space-y-3.5 text-xs">
+                    <Input
+                      id="umrah-days"
+                      label="Package Duration"
+                      placeholder="e.g. 15 Days"
+                      value={umrahDays}
+                      onChange={(e) => setUmrahDays(e.target.value)}
+                      required
+                      disabled={umrahSubmitting}
+                    />
+
+                    <Input
+                      id="umrah-airline"
+                      label="Airline Carrier"
+                      placeholder="e.g. Saudia Arabian Airlines"
+                      value={umrahAirline}
+                      onChange={(e) => setUmrahAirline(e.target.value)}
+                      required
+                      disabled={umrahSubmitting}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        id="umrah-dep-flight"
+                        label="Dep Flight No"
+                        placeholder="e.g. SV723"
+                        value={umrahFlightNoDep}
+                        onChange={(e) => setUmrahFlightNoDep(e.target.value)}
+                        required
+                        disabled={umrahSubmitting}
+                      />
+                      <Input
+                        id="umrah-ret-flight"
+                        label="Ret Flight No"
+                        placeholder="e.g. SV726"
+                        value={umrahFlightNoRet}
+                        onChange={(e) => setUmrahFlightNoRet(e.target.value)}
+                        required
+                        disabled={umrahSubmitting}
+                      />
+                    </div>
+
+                    <Input
+                      id="umrah-dep-details"
+                      label="Departure Details"
+                      placeholder="e.g. ISB 16 Aug 10:35 → JED 16 Aug 13:40"
+                      value={umrahDepDetails}
+                      onChange={(e) => setUmrahDepDetails(e.target.value)}
+                      disabled={umrahSubmitting}
+                    />
+
+                    <Input
+                      id="umrah-ret-details"
+                      label="Return Details"
+                      placeholder="e.g. JED 05 Sep 18:10 → ISB 06 Sep 01:10"
+                      value={umrahRetDetails}
+                      onChange={(e) => setUmrahRetDetails(e.target.value)}
+                      disabled={umrahSubmitting}
+                    />
+
+                    <Input
+                      id="umrah-baggage"
+                      label="Baggage Policy"
+                      placeholder="e.g. 23 KG Departure / 46 KG Return"
+                      value={umrahBaggage}
+                      onChange={(e) => setUmrahBaggage(e.target.value)}
+                      disabled={umrahSubmitting}
+                    />
+
+                    <Input
+                      id="umrah-hotel-makkah"
+                      label="Hotel in Makkah"
+                      placeholder="e.g. Swissôtel Makkah"
+                      value={umrahHotelMakkah}
+                      onChange={(e) => setUmrahHotelMakkah(e.target.value)}
+                      disabled={umrahSubmitting}
+                    />
+
+                    <Input
+                      id="umrah-hotel-madinah"
+                      label="Hotel in Madinah"
+                      placeholder="e.g. Pullman Zamzam Madina"
+                      value={umrahHotelMadinah}
+                      onChange={(e) => setUmrahHotelMadinah(e.target.value)}
+                      disabled={umrahSubmitting}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        id="umrah-price"
+                        label="Price (PKR)"
+                        type="number"
+                        placeholder="e.g. 255000"
+                        value={umrahPrice}
+                        onChange={(e) => setUmrahPrice(e.target.value)}
+                        required
+                        disabled={umrahSubmitting}
+                      />
+                      <Input
+                        id="umrah-seats"
+                        label="Total Seats"
+                        type="number"
+                        placeholder="e.g. 50"
+                        value={umrahTotalSeats}
+                        onChange={(e) => setUmrahTotalSeats(e.target.value)}
+                        required
+                        disabled={umrahSubmitting}
+                      />
+                    </div>
+
+                    {isEditingUmrah && (
+                      <Input
+                        id="umrah-avail-seats"
+                        label="Available Seats Override"
+                        type="number"
+                        placeholder="e.g. 48"
+                        value={umrahAvailableSeats}
+                        onChange={(e) => setUmrahAvailableSeats(e.target.value)}
+                        required
+                        disabled={umrahSubmitting}
+                      />
+                    )}
+
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        id="submit-umrah-btn"
+                        type="submit"
+                        disabled={umrahSubmitting}
+                        className="flex-1 bg-[#ff7300] hover:bg-[#e05e00] text-white font-bold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        {umrahSubmitting ? <LoadingSpinner size="sm" /> : isEditingUmrah ? "Update Package" : "Publish Package"}
+                      </button>
+                      {isEditingUmrah && (
+                        <button
+                          id="cancel-umrah-edit-btn"
+                          type="button"
+                          onClick={resetUmrahForm}
+                          className="px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 rounded-lg text-xs transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </Card>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 6: UMRAH BOOKINGS */}
+          {activeTab === "umrah_bookings" && (
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-xs space-y-4 animate-fadeIn">
+              <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                <div>
+                  <h3 className="text-base font-black text-[#133F5C]">Partner Umrah Package Bookings ({umrahBookings.length})</h3>
+                  <p className="text-xs text-gray-500">Approve, verify, and view dynamic passenger dossiers submitted by travel agents.</p>
+                </div>
+              </div>
+
+              {loadingUmrahBookings ? (
+                <div className="py-12"><LoadingSpinner /></div>
+              ) : umrahBookings.length === 0 ? (
+                <div className="py-12 text-center text-gray-400">
+                  No Umrah Package bookings received from agents yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-500">
+                        <th className="px-4 py-3 text-left font-bold uppercase">Ref ID</th>
+                        <th className="px-4 py-3 text-left font-bold uppercase">Agency Partner</th>
+                        <th className="px-4 py-3 text-left font-bold uppercase">Umrah Package</th>
+                        <th className="px-4 py-3 text-left font-bold uppercase">Passenger Details</th>
+                        <th className="px-4 py-3 text-left font-bold uppercase">Uploaded Documents</th>
+                        <th className="px-4 py-3 text-left font-bold uppercase">Status</th>
+                        <th className="px-4 py-3 text-left font-bold uppercase">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {umrahBookings.map((b) => {
+                        const associatedPkg = umrahPackages.find((p) => p.id === b.packageId);
+                        return (
+                          <tr key={b.bookingId} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-mono font-bold text-gray-500">
+                              #{b.bookingId.substring(0, 8)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-gray-800">{b.agentName}</div>
+                              <div className="text-[10px] text-gray-500 font-mono">{b.agentEmail}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-gray-800">
+                                {associatedPkg ? `${associatedPkg.airline} (${associatedPkg.days})` : "Syncing..."}
+                              </div>
+                              <div className="text-[10px] text-[#ff7300] font-bold">
+                                PKR {associatedPkg?.price.toLocaleString() || "Syncing"}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-gray-800">{b.passengerName}</div>
+                              <div className="text-[10px] text-gray-500 font-mono font-bold">Passport: {b.passengerPassport}</div>
+                            </td>
+                            <td className="px-4 py-3 space-x-2">
+                              {b.passengerPhotoUrl ? (
+                                <button
+                                  onClick={() =>
+                                    setPhotoModal({
+                                      isOpen: true,
+                                      title: `Umrah Photo: ${b.passengerName}`,
+                                      imgUrl: b.passengerPhotoUrl,
+                                    })
+                                  }
+                                  className="text-[10px] text-[#00a29c] font-bold bg-cyan-50 hover:bg-cyan-100 px-2 py-0.5 rounded cursor-pointer"
+                                >
+                                  Photo
+                                </button>
+                              ) : (
+                                <span className="text-gray-400">No Photo</span>
+                              )}
+                              {b.passportPhotoUrl ? (
+                                <button
+                                  onClick={() =>
+                                    setPhotoModal({
+                                      isOpen: true,
+                                      title: `Passport Photo: ${b.passengerName}`,
+                                      imgUrl: b.passportPhotoUrl,
+                                    })
+                                  }
+                                  className="text-[10px] text-blue-600 font-bold bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded cursor-pointer"
+                                >
+                                  Passport
+                                </button>
+                              ) : (
+                                <span className="text-gray-400">No Passport</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge status={b.status} />
+                            </td>
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => handleToggleUmrahBookingStatus(b.bookingId, b.status)}
+                                className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                                  b.status === "Confirmed"
+                                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                                    : "bg-green-600 hover:bg-green-700 text-white shadow-xs"
+                                }`}
+                              >
+                                {b.status === "Confirmed" ? "Set Pending" : "Confirm Tour"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 7: HOTEL INVENTORY */}
+          {activeTab === "hotel_inventory" && (
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-gray-200 shadow-xs">
+                <div>
+                  <h3 className="text-base font-black text-[#133F5C] flex items-center gap-2">
+                    <Hotel className="h-5 w-5 text-[#00a29c]" /> Hotel Inventory & Rates
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Add and publish hotels in Makkah, Madinah, or global cities for B2B Agent reservations.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Active Hotel Listings */}
+                <div className="lg:col-span-2 space-y-4">
+                  <h4 className="text-xs font-black text-[#133F5C] uppercase tracking-wider">
+                    Published Hotels ({hotels.length})
+                  </h4>
+
+                  {loadingHotels ? (
+                    <div className="flex justify-center p-8 bg-white rounded-xl border border-gray-200">
+                      <LoadingSpinner />
+                    </div>
+                  ) : hotels.length === 0 ? (
+                    <Card className="p-8 text-center text-gray-400 text-xs">
+                      No hotel listings found. Use the form on the right to publish your first hotel.
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {hotels.map((h) => (
+                        <div
+                          key={h.id}
+                          className="bg-white rounded-xl border border-gray-200 p-5 hover:border-[#00a29c] transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+                        >
+                          <div className="space-y-1.5 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="bg-[#133F5C] text-white text-[10px] font-black px-2 py-0.5 rounded">
+                                {h.city}
+                              </span>
+                              <h5 className="font-extrabold text-sm text-[#133F5C]">{h.name}</h5>
+                              <div className="flex items-center text-amber-400 text-xs">
+                                {"★".repeat(h.stars)}
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-gray-600 flex items-center gap-1 font-medium">
+                              <MapPin className="h-3.5 w-3.5 text-[#00a29c]" /> {h.distanceToHaram || "Near City Center"}
+                            </p>
+
+                            <p className="text-[11px] text-gray-500">
+                              <BedDouble className="h-3 w-3 inline mr-1 text-gray-400" />
+                              Room Types: <span className="font-semibold text-gray-700">{h.roomTypes}</span>
+                            </p>
+
+                            {h.amenities && (
+                              <p className="text-[10px] text-gray-400 font-mono">
+                                Amenities: {h.amenities}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="text-left sm:text-right space-y-2 border-t sm:border-t-0 pt-3 sm:pt-0 border-gray-100 w-full sm:w-auto">
+                            <div>
+                              <span className="text-[10px] text-gray-400 uppercase font-bold block">Rate / Night</span>
+                              <span className="text-sm font-black text-[#ff7300]">
+                                PKR {h.pricePerNight.toLocaleString()}
+                              </span>
+                            </div>
+
+                            <div className="text-[11px] font-bold text-gray-600">
+                              Rooms: <span className="text-[#00a29c]">{h.availableRooms}</span> / {h.totalRooms}
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1">
+                              <button
+                                onClick={() => handleEditHotelClick(h)}
+                                className="p-1.5 text-gray-500 hover:text-[#00a29c] bg-gray-50 hover:bg-cyan-50 rounded-md transition-colors cursor-pointer text-xs font-bold flex items-center gap-1"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteHotel(h.id)}
+                                className="p-1.5 text-gray-500 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-md transition-colors cursor-pointer text-xs font-bold flex items-center gap-1"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Publish / Edit Hotel Form */}
+                <div>
+                  <Card className="p-5 border border-gray-200">
+                    <h3 className="text-sm font-black text-[#133F5C] pb-3 border-b border-gray-100 mb-4">
+                      {isEditingHotel ? "Edit Hotel Details" : "Publish New Hotel Listing"}
+                    </h3>
+
+                    {hotelError && <Alert id="hotel-error" type="error" message={hotelError} onClose={() => setHotelError("")} />}
+                    {hotelSuccess && <Alert id="hotel-success" type="success" message={hotelSuccess} onClose={() => setHotelSuccess("")} />}
+
+                    <form onSubmit={handleCreateOrUpdateHotel} className="space-y-3.5 text-xs">
+                      <Input
+                        id="hotel-name"
+                        label="Hotel Name"
+                        placeholder="e.g. Swissôtel Makkah"
+                        value={hotelName}
+                        onChange={(e) => setHotelName(e.target.value)}
+                        required
+                        disabled={hotelSubmitting}
+                      />
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-[#133F5C] mb-1">City</label>
+                          <select
+                            value={hotelCity}
+                            onChange={(e) => setHotelCity(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-xs bg-white font-bold text-gray-800"
+                            disabled={hotelSubmitting}
+                          >
+                            <option value="Makkah">Makkah</option>
+                            <option value="Madinah">Madinah</option>
+                            <option value="Jeddah">Jeddah</option>
+                            <option value="Riyadh">Riyadh</option>
+                            <option value="Dubai">Dubai</option>
+                            <option value="Istanbul">Istanbul</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-[#133F5C] mb-1">Star Rating</label>
+                          <select
+                            value={hotelStars}
+                            onChange={(e) => setHotelStars(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-xs bg-white font-bold text-gray-800"
+                            disabled={hotelSubmitting}
+                          >
+                            <option value="5">5 Star Luxury</option>
+                            <option value="4">4 Star Premium</option>
+                            <option value="3">3 Star Standard</option>
+                            <option value="2">2 Star Economy</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <Input
+                        id="hotel-distance"
+                        label="Distance / Location"
+                        placeholder="e.g. 100 meters from King Abdulaziz Gate"
+                        value={hotelDistance}
+                        onChange={(e) => setHotelDistance(e.target.value)}
+                        disabled={hotelSubmitting}
+                      />
+
+                      <Input
+                        id="hotel-rooms-type"
+                        label="Room Sharing Configurations"
+                        placeholder="e.g. Quad / Triple / Double Sharing"
+                        value={hotelRoomTypes}
+                        onChange={(e) => setHotelRoomTypes(e.target.value)}
+                        required
+                        disabled={hotelSubmitting}
+                      />
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          id="hotel-price"
+                          label="Price / Night (PKR)"
+                          type="number"
+                          placeholder="e.g. 28000"
+                          value={hotelPricePerNight}
+                          onChange={(e) => setHotelPricePerNight(e.target.value)}
+                          required
+                          disabled={hotelSubmitting}
+                        />
+                        <Input
+                          id="hotel-[#rooms]"
+                          label="Total Rooms"
+                          type="number"
+                          placeholder="e.g. 20"
+                          value={hotelTotalRooms}
+                          onChange={(e) => setHotelTotalRooms(e.target.value)}
+                          required
+                          disabled={hotelSubmitting}
+                        />
+                      </div>
+
+                      {isEditingHotel && (
+                        <Input
+                          id="hotel-avail-rooms"
+                          label="Available Rooms Override"
+                          type="number"
+                          placeholder="e.g. 18"
+                          value={hotelAvailableRooms}
+                          onChange={(e) => setHotelAvailableRooms(e.target.value)}
+                          required
+                          disabled={hotelSubmitting}
+                        />
+                      )}
+
+                      <Input
+                        id="hotel-amenities"
+                        label="Amenities & Services"
+                        placeholder="e.g. Free WiFi, Breakfast, Haram Shuttle"
+                        value={hotelAmenities}
+                        onChange={(e) => setHotelAmenities(e.target.value)}
+                        disabled={hotelSubmitting}
+                      />
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          id="submit-hotel-btn"
+                          type="submit"
+                          disabled={hotelSubmitting}
+                          className="flex-1 bg-[#ff7300] hover:bg-[#e05e00] text-white font-bold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          {hotelSubmitting ? <LoadingSpinner size="sm" /> : isEditingHotel ? "Update Hotel" : "Publish Hotel"}
+                        </button>
+                        {isEditingHotel && (
+                          <button
+                            id="cancel-hotel-edit-btn"
+                            type="button"
+                            onClick={resetHotelForm}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-3 py-2 rounded-lg text-xs cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 8: HOTEL BOOKINGS */}
+          {activeTab === "hotel_bookings" && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-gray-200 shadow-xs">
+                <div>
+                  <h3 className="text-base font-black text-[#133F5C] flex items-center gap-2">
+                    <BedDouble className="h-5 w-5 text-[#00a29c]" /> Partner Hotel Bookings Log
+                  </h3>
+                  <p className="text-xs text-gray-500">Review, manage, and confirm room reservations submitted by B2B travel agents.</p>
+                </div>
+              </div>
+
+              {loadingHotelBookings ? (
+                <div className="flex justify-center p-12 bg-white rounded-xl border border-gray-200">
+                  <LoadingSpinner />
+                </div>
+              ) : hotelBookings.length === 0 ? (
+                <Card className="p-12 text-center text-gray-400 text-xs">
+                  No agent hotel bookings recorded yet.
+                </Card>
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-xs">
+                  <table className="min-w-full divide-y divide-gray-200 text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-500 font-bold uppercase">
+                        <th className="px-4 py-3 text-left">Ref ID</th>
+                        <th className="px-4 py-3 text-left">Hotel & Location</th>
+                        <th className="px-4 py-3 text-left">Guest Details</th>
+                        <th className="px-4 py-3 text-left">Check-In / Out</th>
+                        <th className="px-4 py-3 text-left">Rooms / Cost</th>
+                        <th className="px-4 py-3 text-left">Agent</th>
+                        <th className="px-4 py-3 text-left">Status</th>
+                        <th className="px-4 py-3 text-left">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {hotelBookings.map((hb) => (
+                        <tr key={hb.bookingId} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-mono font-bold text-gray-500">
+                            #{hb.bookingId.substring(0, 8)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-gray-800">{hb.hotelName}</div>
+                            <div className="text-[10px] text-[#00a29c] font-bold">{hb.city}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-gray-800">{hb.guestName}</div>
+                            <div className="text-[10px] text-gray-500 font-mono">Phone: {hb.guestPhone}</div>
+                            <div className="text-[10px] text-gray-500 font-mono">Passport: {hb.passportNo}</div>
+                          </td>
+                          <td className="px-4 py-3 space-y-0.5 text-[11px]">
+                            <div><strong>In:</strong> {hb.checkInDate}</div>
+                            <div><strong>Out:</strong> {hb.checkOutDate}</div>
+                            <div className="text-[10px] text-gray-400 font-bold">{hb.nights} Night(s)</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-[#ff7300]">
+                              PKR {hb.totalCost ? hb.totalCost.toLocaleString() : "0"}
+                            </div>
+                            <div className="text-[10px] text-gray-500">
+                              {hb.numberOfRooms} Room(s) ({hb.roomType})
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-gray-700">{hb.agentName}</div>
+                            <div className="text-[10px] text-gray-400">{hb.agentEmail}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge status={hb.status} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                  const matchingHotel = hotels.find((h) => h.id === hb.hotelId);
+                                  setVoucherModal({
+                                    isOpen: true,
+                                    booking: hb,
+                                    hotel: matchingHotel,
+                                  });
+                                }}
+                                className="px-2.5 py-1 bg-[#5da855] hover:bg-[#4d8f45] text-white text-xs font-bold rounded shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                                <span>Voucher</span>
+                              </button>
+                              <button
+                                onClick={() => handleToggleHotelBookingStatus(hb.bookingId, hb.status)}
+                                className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                                  hb.status === "Confirmed"
+                                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                                    : "bg-green-600 hover:bg-green-700 text-white shadow-xs"
+                                }`}
+                              >
+                                {hb.status === "Confirmed" ? "Set Pending" : "Confirm Hotel"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       </main>
+
 
       {/* PHOTO PREVIEW MODAL */}
       {photoModal.isOpen && (
@@ -1162,6 +2471,22 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
       )}
+
+      {/* TICKET INVOICE MODAL */}
+      <TicketInvoiceModal
+        isOpen={invoiceModal.isOpen}
+        onClose={() => setInvoiceModal({ isOpen: false, booking: null, ticket: null })}
+        booking={invoiceModal.booking}
+        ticket={invoiceModal.ticket}
+      />
+
+      {/* HOTEL VOUCHER MODAL */}
+      <HotelVoucherModal
+        isOpen={voucherModal.isOpen}
+        onClose={() => setVoucherModal({ isOpen: false, booking: null, hotel: null })}
+        booking={voucherModal.booking}
+        hotel={voucherModal.hotel}
+      />
 
     </div>
   );

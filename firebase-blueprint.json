@@ -1,0 +1,171 @@
+{
+  "entities": {
+    "Ticket": {
+      "title": "B2B Flight Ticket Schedule",
+      "description": "Represents a flight inventory record.",
+      "type": "object",
+      "properties": {
+        "airline": { "type": "string" },
+        "pnrPrefix": { "type": "string" },
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "departureDate": { "type": "string" },
+        "price": { "type": "number" },
+        "totalSeats": { "type": "integer" },
+        "availableSeats": { "type": "integer" }
+      },
+      "required": ["airline", "pnrPrefix", "origin", "destination", "departureDate", "price", "totalSeats", "availableSeats"]
+    },
+    "Booking": {
+      "title": "B2B Flight Booking Dossier",
+      "description": "Represents a passenger flight seat reservation.",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string" },
+        "ticketId": { "type": "string" },
+        "agentName": { "type": "string" },
+        "agentEmail": { "type": "string" },
+        "passengerName": { "type": "string" },
+        "passengerPassport": { "type": "string" },
+        "passengerPhotoUrl": { "type": "string" },
+        "passportPhotoUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed"] }
+      },
+      "required": ["bookingId", "ticketId", "agentName", "agentEmail", "passengerName", "passengerPassport", "status"]
+    },
+    "LedgerTransaction": {
+      "title": "B2B Financial Ledger Transaction",
+      "description": "Represents credits and debits to an agent's account.",
+      "type": "object",
+      "properties": {
+        "agentEmail": { "type": "string" },
+        "agentName": { "type": "string" },
+        "type": { "type": "string", "enum": ["Credit", "Debit"] },
+        "amount": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["agentEmail", "agentName", "type", "amount", "description"]
+    },
+    "SystemNotification": {
+      "title": "B2B Admin Alert Broadcast Notice",
+      "description": "Global notices published by system administrators.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "alert", "promo"] }
+      },
+      "required": ["title", "content", "type"]
+    },
+    "UmrahPackage": {
+      "title": "Dynamic Umrah Group Package",
+      "description": "Represents a package detailing flight schedules, hotels, and seats for Umrah.",
+      "type": "object",
+      "properties": {
+        "days": { "type": "string" },
+        "airline": { "type": "string" },
+        "flightNoDep": { "type": "string" },
+        "flightNoRet": { "type": "string" },
+        "depDetails": { "type": "string" },
+        "retDetails": { "type": "string" },
+        "baggage": { "type": "string" },
+        "price": { "type": "number" },
+        "hotelMakkah": { "type": "string" },
+        "hotelMadinah": { "type": "string" },
+        "totalSeats": { "type": "integer" },
+        "availableSeats": { "type": "integer" }
+      },
+      "required": ["days", "airline", "flightNoDep", "flightNoRet", "depDetails", "retDetails", "baggage", "price", "hotelMakkah", "hotelMadinah", "totalSeats", "availableSeats"]
+    },
+    "UmrahBooking": {
+      "title": "B2B Umrah Package Booking Dossier",
+      "description": "Passenger ticket record for an Umrah Group Package booking.",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string" },
+        "packageId": { "type": "string" },
+        "agentName": { "type": "string" },
+        "agentEmail": { "type": "string" },
+        "passengerName": { "type": "string" },
+        "passengerPassport": { "type": "string" },
+        "passengerPhotoUrl": { "type": "string" },
+        "passportPhotoUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed"] }
+      },
+      "required": ["bookingId", "packageId", "agentName", "agentEmail", "passengerName", "passengerPassport", "status"]
+    },
+    "HotelListing": {
+      "title": "Hotel Inventory Listing",
+      "description": "Represents a hotel available for B2B reservations.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "city": { "type": "string" },
+        "stars": { "type": "integer" },
+        "distanceToHaram": { "type": "string" },
+        "roomTypes": { "type": "string" },
+        "pricePerNight": { "type": "number" },
+        "totalRooms": { "type": "integer" },
+        "availableRooms": { "type": "integer" }
+      },
+      "required": ["name", "city", "stars", "pricePerNight", "totalRooms", "availableRooms"]
+    },
+    "HotelBooking": {
+      "title": "Hotel Reservation Booking",
+      "description": "Represents a hotel reservation placed by an agent.",
+      "type": "object",
+      "properties": {
+        "hotelId": { "type": "string" },
+        "hotelName": { "type": "string" },
+        "city": { "type": "string" },
+        "agentName": { "type": "string" },
+        "agentEmail": { "type": "string" },
+        "guestName": { "type": "string" },
+        "guestPhone": { "type": "string" },
+        "passportNo": { "type": "string" },
+        "checkInDate": { "type": "string" },
+        "checkOutDate": { "type": "string" },
+        "nights": { "type": "integer" },
+        "roomType": { "type": "string" },
+        "numberOfRooms": { "type": "integer" },
+        "totalCost": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed"] }
+      },
+      "required": ["hotelId", "hotelName", "city", "agentName", "agentEmail", "guestName", "checkInDate", "checkOutDate", "status"]
+    }
+  },
+  "firestore": {
+    "/tickets/{ticketId}": {
+      "schema": "Ticket",
+      "description": "Flight inventory catalog list."
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Passenger flight ticket reservations."
+    },
+    "/ledgers/{ledgerId}": {
+      "schema": "LedgerTransaction",
+      "description": "Financial debit and credit transaction logs."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "SystemNotification",
+      "description": "Global administrator announcements."
+    },
+    "/umrah_packages/{packageId}": {
+      "schema": "UmrahPackage",
+      "description": "Admin-published dynamic Umrah group packages inventory."
+    },
+    "/umrah_bookings/{bookingId}": {
+      "schema": "UmrahBooking",
+      "description": "Travel agents booking dossiers of Umrah packages."
+    },
+    "/hotels/{hotelId}": {
+      "schema": "HotelListing",
+      "description": "Hotel listings inventory."
+    },
+    "/hotel_bookings/{bookingId}": {
+      "schema": "HotelBooking",
+      "description": "Hotel room reservations log."
+    }
+  }
+}

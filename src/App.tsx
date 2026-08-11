@@ -17,8 +17,12 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // Force reload to get latest emailVerified flag status
-          await reload(firebaseUser);
+          // Attempt reload to fetch latest emailVerified status, safely ignoring transient network failures
+          try {
+            await reload(firebaseUser);
+          } catch (reloadErr) {
+            console.warn("Skipping user profile network reload due to connection status:", reloadErr);
+          }
           
           const email = firebaseUser.email || "";
           
@@ -43,7 +47,11 @@ export default function App() {
             setUser(firebaseUser);
           } else {
             // Unverified agents are signed out securely
-            await signOut(auth);
+            try {
+              await signOut(auth);
+            } catch (signOutErr) {
+              console.warn("SignOut warning for unverified user:", signOutErr);
+            }
             setUser(null);
             setUserRole(null);
           }
