@@ -46,6 +46,31 @@ import {
   Star
 } from "lucide-react";
 
+const sendApprovalNotification = async (
+  subject: string,
+  details: Record<string, any>,
+  agentEmail: string
+) => {
+  try {
+    const payload = {
+      _subject: `🎟️ Ticket Broker: ${subject}`,
+      _template: "table",
+      _cc: agentEmail,
+      ...details,
+    };
+    await fetch("https://formsubmit.co/ajax/teemabdulrehman.com@gmail.com", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    console.error("Failed to send approval email notification:", err);
+  }
+};
+
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   // Navigation: 'inventory' | 'bookings' | 'ledger' | 'notifications' | 'umrah_inventory' | 'umrah_bookings' | 'hotel_inventory' | 'hotel_bookings'
   const [activeTab, setActiveTab] = useState<string>("inventory");
@@ -667,6 +692,25 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       await updateDoc(docRef, {
         status: nextStatus,
       });
+
+      if (nextStatus === "Confirmed") {
+        const targetBooking = bookings.find(b => b.bookingId === bookingId);
+        if (targetBooking && targetBooking.agentEmail) {
+          sendApprovalNotification(
+            "Flight Ticket Booking Confirmed & Approved",
+            {
+              "Status": "APPROVED & CONFIRMED",
+              "Booking ID": bookingId,
+              "Agent Name": targetBooking.agentName,
+              "Agent Email": targetBooking.agentEmail,
+              "Passenger Name": targetBooking.passengerName,
+              "Passenger Passport": targetBooking.passengerPassport,
+              "Message": "Your B2B flight ticket booking has been successfully approved and confirmed by the administrator."
+            },
+            targetBooking.agentEmail
+          );
+        }
+      }
     } catch (err: any) {
       console.error("Update status error:", err);
       alert("Failed to update booking status: " + err.message);
@@ -877,6 +921,25 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       await updateDoc(docRef, {
         status: nextStatus,
       });
+
+      if (nextStatus === "Confirmed") {
+        const targetBooking = umrahBookings.find(b => b.bookingId === bookingId);
+        if (targetBooking && targetBooking.agentEmail) {
+          sendApprovalNotification(
+            "Umrah Group Package Booking Confirmed & Approved",
+            {
+              "Status": "APPROVED & CONFIRMED",
+              "Booking ID": bookingId,
+              "Agent Name": targetBooking.agentName,
+              "Agent Email": targetBooking.agentEmail,
+              "Passenger Name": targetBooking.passengerName,
+              "Passenger Passport": targetBooking.passengerPassport,
+              "Message": "Your B2B Umrah Package booking has been successfully approved and confirmed by the administrator."
+            },
+            targetBooking.agentEmail
+          );
+        }
+      }
     } catch (err: any) {
       console.error("Update status error:", err);
       alert("Failed to update booking status: " + err.message);
@@ -1007,6 +1070,28 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       const nextStatus = currentStatus === "Confirmed" ? "Pending" : "Confirmed";
       const docRef = doc(db, "hotelBookings", bookingId);
       await updateDoc(docRef, { status: nextStatus });
+
+      if (nextStatus === "Confirmed") {
+        const targetBooking = hotelBookings.find(b => b.bookingId === bookingId);
+        if (targetBooking && targetBooking.agentEmail) {
+          sendApprovalNotification(
+            "Hotel Reservation Confirmed & Approved",
+            {
+              "Status": "APPROVED & CONFIRMED",
+              "Booking ID": bookingId,
+              "Agent Name": targetBooking.agentName,
+              "Agent Email": targetBooking.agentEmail,
+              "Guest Name": targetBooking.guestName,
+              "Hotel Name": targetBooking.hotelName,
+              "City": targetBooking.city,
+              "Check-In": targetBooking.checkInDate,
+              "Check-Out": targetBooking.checkOutDate,
+              "Message": "Your B2B Hotel room reservation has been successfully approved and confirmed by the administrator."
+            },
+            targetBooking.agentEmail
+          );
+        }
+      }
     } catch (err: any) {
       console.error("Update hotel booking status error:", err);
       alert("Failed to update status: " + err.message);

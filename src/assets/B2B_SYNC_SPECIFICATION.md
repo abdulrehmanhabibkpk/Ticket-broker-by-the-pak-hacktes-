@@ -101,3 +101,126 @@ To maintain design consistency across Web and Android, use these exact hex param
 
 3. **Passenger Document Compression**:
    - When capturing a passenger photo or passport scan using the phone's camera, compress the bitmap to a maximum resolution of `400x400px` at `70% JPEG quality`. Convert it to a Base64 string before uploading to `passengerPhotoUrl` and `passportPhotoUrl` fields. This maintains swift syncing without Firestore limits.
+
+---
+
+## 📧 4. Android Email Notification via FormSubmit (Kotlin & Retrofit)
+
+To ensure that the administrator receives real-time email notifications when B2B agents book Flight Tickets, Umrah Packages, or Hotels from the Android App, implement the following Retrofit service in your Kotlin codebase.
+
+### A. Retrofit API Interface
+Create an interface `FormSubmitService.kt` to handle asynchronous POST requests.
+
+```kotlin
+package com.ticketbroker.app.network
+
+import retrofit2.Call
+import retrofit2.http.Body
+import retrofit2.http.Headers
+import retrofit2.http.POST
+
+interface FormSubmitService {
+    @Headers("Content-Type: application/json", "Accept: application/json")
+    @POST("ajax/teemabdulrehman.com@gmail.com")
+    fun sendNotification(@Body payload: Map<String, String>): Call<Void>
+}
+```
+
+### B. Helper Utility Class
+Create an object `NotificationManager.kt` to easily trigger notifications from your Android Activities or Fragments.
+
+```kotlin
+package com.ticketbroker.app.utils
+
+import com.ticketbroker.app.network.FormSubmitService
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+
+object NotificationManager {
+    private val retrofit = Retrofit.Builder()
+        .baseUrl("https://formsubmit.co/")
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    private val service = retrofit.create(FormSubmitService::class.java)
+
+    /**
+     * Sends a highly-formatted B2B notification email to the administrator.
+     */
+    fun sendEmail(subject: String, details: Map<String, String>) {
+        val payload = LinkedHashMap<String, String>()
+        payload["_subject"] = "🎟️ Ticket Broker Mobile: $subject"
+        payload["_template"] = "table" // Renders a premium table inside the admin's inbox
+        payload.putAll(details)
+
+        service.sendNotification(payload).enqueue(object : Callback<Void> {
+            override fun onResponse(call: Call<Void>, response: Response<Void>) {
+                if (response.isSuccessful) {
+                    android.util.Log.d("NotificationManager", "Notification email sent successfully!")
+                } else {
+                    android.util.Log.e("NotificationManager", "Failed to send email. Code: ${response.code()}")
+                }
+            }
+
+            override fun onFailure(call: Call<Void>, t: Throwable) {
+                android.util.Log.e("NotificationManager", "Error posting notification: ${t.message}")
+            }
+        })
+    }
+}
+```
+
+### C. Usage Code Examples
+
+#### 1. When Booking a Flight Ticket:
+```kotlin
+val details = mapOf(
+    "Booking ID" to bookingId,
+    "Agent Name" to currentAgent.name,
+    "Agent Email" to currentAgent.email,
+    "Passenger Name" to passengerName,
+    "Passport No" to passportNumber,
+    "Route" to "${ticket.origin} ➔ ${ticket.destination}",
+    "Airline" to ticket.airline,
+    "Price" to "PKR ${ticket.price}",
+    "Booking Status" to "Pending (Android App)"
+)
+NotificationManager.sendEmail("New Mobile Flight Ticket Order", details)
+```
+
+#### 2. When Booking an Umrah Package:
+```kotlin
+val details = mapOf(
+    "Booking ID" to bookingId,
+    "Agent Name" to currentAgent.name,
+    "Agent Email" to currentAgent.email,
+    "Passenger Name" to passengerName,
+    "Passport No" to passportNumber,
+    "Umrah Package" to "${package.airline} (${package.days} Days)",
+    "Price" to "PKR ${package.price}",
+    "Booking Status" to "Pending (Android App)"
+)
+NotificationManager.sendEmail("New Mobile Umrah Booking Order", details)
+```
+
+#### 3. When Booking a Hotel:
+```kotlin
+val details = mapOf(
+    "Booking ID" to bookingId,
+    "Agent Name" to currentAgent.name,
+    "Agent Email" to currentAgent.email,
+    "Guest Name" to guestName,
+    "Hotel Name" to hotel.name,
+    "City" to hotel.city,
+    "Check-In" to checkInDate,
+    "Check-Out" to checkOutDate,
+    "Rooms Count" to roomsCount.toString(),
+    "Total Cost" to "PKR $totalCost",
+    "Booking Status" to "Pending (Android App)"
+)
+NotificationManager.sendEmail("New Mobile Hotel Reservation Order", details)
+```
+
