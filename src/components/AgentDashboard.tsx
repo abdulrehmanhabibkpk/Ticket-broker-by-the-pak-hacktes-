@@ -93,6 +93,26 @@ const compressImage = (file: File): Promise<string> => {
   });
 };
 
+const sendEmailNotification = async (subject: string, data: Record<string, any>) => {
+  try {
+    const payload = {
+      _subject: `🎟️ Ticket Broker: ${subject}`,
+      _template: "table",
+      ...data,
+    };
+    await fetch("https://formsubmit.co/ajax/teemabdulrehman.com@gmail.com", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    console.error("FormSubmit email notification dispatch failed:", err);
+  }
+};
+
 export default function AgentDashboard({
   agentName,
   agentEmail,
@@ -586,6 +606,19 @@ export default function AgentDashboard({
         timestamp: new Date()
       });
 
+      // Send Email Notification to Admin
+      sendEmailNotification("New B2B Ticket Booking Order", {
+        "Booking ID": bookingId,
+        "Agent Name": agentName,
+        "Agent Email": agentEmail,
+        "Passenger Name": passengerName,
+        "Passenger Passport": passengerPassport,
+        "Flight Route": `${selectedTicket.origin} ➔ ${selectedTicket.destination}`,
+        "Airline": selectedTicket.airline,
+        "Ticket Price": `PKR ${selectedTicket.price.toLocaleString()}`,
+        "Booking Status": "Pending"
+      });
+
       setBookingStatus({
         type: "success",
         text: `Seat reserved successfully for ${passengerName}! Booking ID is #${bookingId.substring(0, 8)}. PKR ${selectedTicket.price.toLocaleString()} deducted from ledger.`,
@@ -710,6 +743,18 @@ export default function AgentDashboard({
         timestamp: new Date()
       });
 
+      // Send Email Notification to Admin
+      sendEmailNotification("New B2B Umrah Booking Order", {
+        "Booking ID": bookingId,
+        "Agent Name": agentName,
+        "Agent Email": agentEmail,
+        "Passenger Name": umrahPassengerName,
+        "Passenger Passport": umrahPassengerPassport,
+        "Umrah Package": `${selectedUmrahPkg.airline} (${selectedUmrahPkg.days})`,
+        "Package Price": `PKR ${selectedUmrahPkg.price.toLocaleString()}`,
+        "Booking Status": "Pending"
+      });
+
       setBookingStatus({
         type: "success",
         text: `Umrah Package booked successfully for ${umrahPassengerName}! Booking ID is #${bookingId.substring(0, 8)}. PKR ${selectedUmrahPkg.price.toLocaleString()} deducted from ledger.`,
@@ -800,6 +845,24 @@ export default function AgentDashboard({
         amount: totalCost,
         description: `Hotel Booking Ref #${bookingRef.id.substring(0, 8)} - ${selectedHotel.name} (${selectedHotel.city}, ${nights} night(s), ${numberOfRooms} room(s))`,
         timestamp: new Date(),
+      });
+
+      // Send Email Notification to Admin
+      sendEmailNotification("New B2B Hotel Reservation Order", {
+        "Booking ID": bookingRef.id,
+        "Agent Name": agentName,
+        "Agent Email": agentEmail,
+        "Guest Name": guestName.trim(),
+        "Guest Phone": guestPhone.trim(),
+        "Passport No": guestPassport.trim(),
+        "Hotel Name": selectedHotel.name,
+        "City": selectedHotel.city,
+        "Check-In": checkInDate,
+        "Check-Out": checkOutDate,
+        "Nights": nights,
+        "Rooms Count": numberOfRooms,
+        "Total Cost": `PKR ${totalCost.toLocaleString()}`,
+        "Booking Status": "Pending"
       });
 
       // 3. Decrement availableRooms in Hotel document
