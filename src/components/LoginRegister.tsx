@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import logo from "../assets/images/logo.png";
 import { auth } from "../firebase";
 import {
   signInWithEmailAndPassword,
@@ -174,20 +175,20 @@ export default function LoginRegister({
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#F9FAFB] -mx-4 sm:-mx-6 lg:-mx-8 -my-8 font-sans">
       
-      {/* LEFT SIDE PANEL - BOOK BROKER BRAND & MOBILE PARTNER PREVIEW */}
+      {/* LEFT SIDE PANEL - TICKET BROKER BRAND & MOBILE PARTNER PREVIEW */}
       <div className="w-full md:w-1/2 bg-[#133F5C] text-white p-12 flex flex-col justify-between relative overflow-hidden">
         {/* Subtle decorative circles for a premium luxury touch */}
         <div className="absolute -top-16 -left-16 h-64 w-64 rounded-full bg-cyan-600/10 blur-2xl"></div>
         <div className="absolute -bottom-16 -right-16 h-80 w-80 rounded-full bg-orange-600/10 blur-2xl"></div>
 
         {/* Header Branding */}
-        <div className="flex items-center gap-3.5 relative z-10">
-          <div className="bg-[#ff7300] p-2.5 rounded-full flex items-center justify-center shadow-lg">
-            <Plane className="h-6 w-6 text-white transform -rotate-45" />
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="bg-white p-1.5 rounded-xl flex items-center justify-center shadow-lg w-12 h-12 shrink-0">
+            <img src={logo} alt="Ticket Broker Logo" className="h-full w-full object-contain rounded-lg" referrerPolicy="no-referrer" />
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tight leading-none">
-              <span className="text-white">BOOK </span>
+              <span className="text-white">TICKET </span>
               <span className="text-[#ff7300]">BROKER</span>
             </h1>
             <span className="text-[10px] text-cyan-300 font-mono tracking-widest block mt-1 uppercase font-bold">
@@ -227,7 +228,7 @@ export default function LoginRegister({
 
         {/* Footer Subtext */}
         <div className="relative z-10 text-gray-400 text-xs">
-          <p>© 2026 Book Broker Travel & Tours. All rights reserved.</p>
+          <p>© 2026 Ticket Broker Travel & Tours. All rights reserved.</p>
         </div>
       </div>
 

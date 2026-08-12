@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import logo from "../assets/images/logo.png";
 import { db } from "../firebase";
 import {
   collection,
@@ -12,7 +13,7 @@ import {
   getDocs
 } from "firebase/firestore";
 import { Ticket, Booking, LedgerTransaction, SystemNotification, UmrahPackage, UmrahBooking, HotelListing, HotelBooking } from "../types";
-import { Button, Input, Card, Badge, LoadingSpinner, Alert } from "./UIComponents";
+import { Button, Input, Card, Badge, LoadingSpinner, Alert, Skeleton, TableSkeleton, CardSkeleton } from "./UIComponents";
 import { TicketInvoiceModal } from "./TicketInvoiceModal";
 import { HotelVoucherModal } from "./HotelVoucherModal";
 import { UmrahPackageInvoiceModal } from "./UmrahPackageInvoiceModal";
@@ -1032,17 +1033,17 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="flex min-h-[90vh] bg-[#F9FAFB] -mx-4 sm:-mx-6 lg:-mx-8 -my-8 font-sans">
       
-      {/* SIDEBAR NAVIGATION - MATCHING BOOK BROKER STYLE */}
+      {/* SIDEBAR NAVIGATION - MATCHING TICKET BROKER STYLE */}
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between shrink-0 hidden md:flex">
         <div>
           {/* Logo brand */}
           <div className="p-6 border-b border-gray-100 flex items-center gap-3 bg-[#133F5C] text-white">
-            <div className="bg-[#ff7300] p-1.5 rounded-full flex items-center justify-center">
-              <Plane className="h-5 w-5 text-white transform -rotate-45" />
+            <div className="bg-white p-1 rounded-lg flex items-center justify-center shadow-md w-10 h-10 shrink-0">
+              <img src={logo} alt="Ticket Broker Logo" className="h-full w-full object-contain rounded-md" referrerPolicy="no-referrer" />
             </div>
             <div>
               <h2 className="text-xl font-extrabold tracking-tight flex items-center gap-1 leading-none">
-                <span className="text-white font-black">BOOK </span>
+                <span className="text-white font-black">TICKET </span>
                 <span className="text-[#ff7300] font-black">BROKER</span>
               </h2>
               <span className="text-[9px] text-gray-300 font-mono tracking-wider block mt-1">
@@ -1233,7 +1234,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
 
                   {loadingTickets ? (
-                    <div className="py-12"><LoadingSpinner /></div>
+                    <TableSkeleton />
                   ) : tickets.length === 0 ? (
                     <div className="py-12 text-center text-gray-400">
                       No active flight listings found. Fill the form on the right to publish your first flight.
@@ -1430,7 +1431,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </div>
 
               {loadingBookings ? (
-                <div className="py-12"><LoadingSpinner /></div>
+                <TableSkeleton />
               ) : bookings.length === 0 ? (
                 <div className="py-12 text-center text-gray-400">
                   No bookings registered in the system yet. Active agents bookings will appear here in real-time.
@@ -1572,7 +1573,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
 
                   {loadingLedgers ? (
-                    <div className="py-12"><LoadingSpinner /></div>
+                    <TableSkeleton />
                   ) : ledgers.length === 0 ? (
                     <div className="py-12 text-center text-gray-400">
                       No ledger transactions logged yet. Use the right form to approve credit top-ups.
@@ -1826,7 +1827,10 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
 
                   {loadingUmrahPackages ? (
-                    <div className="py-12"><LoadingSpinner /></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <CardSkeleton />
+                      <CardSkeleton />
+                    </div>
                   ) : umrahPackages.length === 0 ? (
                     <div className="py-12 text-center text-gray-400">
                       No Umrah packages published yet. Use the form on the right to create your first package.
@@ -2061,7 +2065,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </div>
 
               {loadingUmrahBookings ? (
-                <div className="py-12"><LoadingSpinner /></div>
+                <TableSkeleton />
               ) : umrahBookings.length === 0 ? (
                 <div className="py-12 text-center text-gray-400">
                   No Umrah Package bookings received from agents yet.
@@ -2200,8 +2204,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </h4>
 
                   {loadingHotels ? (
-                    <div className="flex justify-center p-8 bg-white rounded-xl border border-gray-200">
-                      <LoadingSpinner />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <CardSkeleton />
+                      <CardSkeleton />
                     </div>
                   ) : hotels.length === 0 ? (
                     <Card className="p-8 text-center text-gray-400 text-xs">
@@ -2433,8 +2438,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </div>
 
               {loadingHotelBookings ? (
-                <div className="flex justify-center p-12 bg-white rounded-xl border border-gray-200">
-                  <LoadingSpinner />
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xs">
+                  <TableSkeleton />
                 </div>
               ) : hotelBookings.length === 0 ? (
                 <Card className="p-12 text-center text-gray-400 text-xs">

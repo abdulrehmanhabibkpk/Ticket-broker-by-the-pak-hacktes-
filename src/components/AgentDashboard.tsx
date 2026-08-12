@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import logo from "../assets/images/logo.png";
 import { db } from "../firebase";
 import {
   collection,
@@ -13,7 +14,7 @@ import {
   addDoc
 } from "firebase/firestore";
 import { Ticket, Booking, LedgerTransaction, SystemNotification, UmrahPackage, UmrahBooking, HotelListing, HotelBooking } from "../types";
-import { Button, Input, Card, Badge, LoadingSpinner, Alert } from "./UIComponents";
+import { Button, Input, Card, Badge, LoadingSpinner, Alert, Skeleton, TableSkeleton, CardSkeleton } from "./UIComponents";
 import { TicketInvoiceModal } from "./TicketInvoiceModal";
 import { HotelVoucherModal } from "./HotelVoucherModal";
 import { UmrahPackageInvoiceModal } from "./UmrahPackageInvoiceModal";
@@ -952,17 +953,17 @@ export default function AgentDashboard({
   return (
     <div className="flex min-h-[90vh] bg-[#F9FAFB] -mx-4 sm:-mx-6 lg:-mx-8 -my-8 font-sans">
       
-      {/* SIDEBAR NAVIGATION - MATCHING BOOK BROKER EXACT STYLE & DESIGN */}
+      {/* SIDEBAR NAVIGATION - MATCHING TICKET BROKER EXACT STYLE & DESIGN */}
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col justify-between shrink-0 hidden md:flex">
         <div>
-          {/* Book Broker Brand Header with Jet icon */}
+          {/* Ticket Broker Brand Header with logo */}
           <div className="p-6 border-b border-gray-100 flex items-center gap-3 bg-[#133F5C] text-white">
-            <div className="bg-[#ff7300] p-1.5 rounded-full flex items-center justify-center">
-              <Plane className="h-5 w-5 text-white transform -rotate-45" />
+            <div className="bg-white p-1 rounded-lg flex items-center justify-center shadow-md w-10 h-10 shrink-0">
+              <img src={logo} alt="Ticket Broker Logo" className="h-full w-full object-contain rounded-md" referrerPolicy="no-referrer" />
             </div>
             <div>
               <h2 className="text-xl font-extrabold tracking-tight flex items-center gap-1 leading-none">
-                <span className="text-white">BOOK </span>
+                <span className="text-white">TICKET </span>
                 <span className="text-[#ff7300]">BROKER</span>
               </h2>
               <span className="text-[9px] text-gray-300 font-mono tracking-wider block mt-1">
@@ -1345,8 +1346,8 @@ export default function AgentDashboard({
                 <div className="lg:col-span-8 space-y-6">
                   
                   {loadingTickets ? (
-                    <div className="py-20 bg-white border border-gray-200 rounded-xl">
-                      <LoadingSpinner />
+                    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                      <TableSkeleton />
                     </div>
                   ) : filteredTickets.length === 0 ? (
                     <div className="py-16 text-center text-gray-500 bg-white border border-dashed border-gray-300 rounded-xl p-8">
@@ -1620,7 +1621,7 @@ export default function AgentDashboard({
               </div>
 
               {loadingBookings ? (
-                <div className="py-12"><LoadingSpinner /></div>
+                <TableSkeleton />
               ) : myBookings.length === 0 ? (
                 <div className="py-12 text-center text-gray-400">
                   No bookings completed yet. Select a flight listing under "Book Tickets" to reserve seats.
@@ -1756,7 +1757,7 @@ export default function AgentDashboard({
                 </h3>
 
                 {loadingLedgers ? (
-                  <div className="py-12"><LoadingSpinner /></div>
+                  <TableSkeleton />
                 ) : ledgers.length === 0 ? (
                   <div className="text-center py-12">
                     <p className="text-xs font-bold text-[#133F5C]">No transaction statement currently generated.</p>
@@ -1873,7 +1874,7 @@ export default function AgentDashboard({
                       </div>
                     </div>
                     <div className="text-xs space-y-1.5 text-gray-600">
-                      <p><strong>Account Name:</strong> Book Broker Travel & Tours</p>
+                      <p><strong>Account Name:</strong> Ticket Broker Travel & Tours</p>
                       <p><strong>Account Number:</strong> 0513-010543210</p>
                       <p><strong>Branch:</strong> Blue Area Branch, Islamabad</p>
                       <p><strong>IBAN:</strong> PK87MEZN0513010543210</p>
@@ -1890,7 +1891,7 @@ export default function AgentDashboard({
                       </div>
                     </div>
                     <div className="text-xs space-y-1.5 text-gray-600">
-                      <p><strong>Account Name:</strong> Book Broker Travel & Tours</p>
+                      <p><strong>Account Name:</strong> Ticket Broker Travel & Tours</p>
                       <p><strong>Account Number:</strong> 0010-065432102</p>
                       <p><strong>Branch:</strong> F-10 Markaz, Islamabad</p>
                       <p><strong>IBAN:</strong> PK54ALHL0010065432102</p>
@@ -1907,7 +1908,7 @@ export default function AgentDashboard({
                       </div>
                     </div>
                     <div className="text-xs space-y-1.5 text-gray-600">
-                      <p><strong>Account Name:</strong> Book Broker Travel & Tours</p>
+                      <p><strong>Account Name:</strong> Ticket Broker Travel & Tours</p>
                       <p><strong>Account Number:</strong> 2201-987654321</p>
                       <p><strong>Branch:</strong> Jinnah Avenue Branch, Islamabad</p>
                       <p><strong>IBAN:</strong> PK92HABB2201987654321</p>
@@ -2317,8 +2318,10 @@ export default function AgentDashboard({
                 </h3>
 
                 {loadingHotels ? (
-                  <div className="flex justify-center p-12 bg-white rounded-xl border border-gray-200">
-                    <LoadingSpinner />
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <CardSkeleton />
+                    <CardSkeleton />
+                    <CardSkeleton />
                   </div>
                 ) : hotels.length === 0 ? (
                   <Card className="p-8 text-center text-gray-400 text-xs">
