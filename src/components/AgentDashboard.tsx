@@ -98,6 +98,8 @@ const sendEmailNotification = async (subject: string, data: Record<string, any>)
     const payload = {
       _subject: `🎟️ Ticket Broker: ${subject}`,
       _template: "table",
+      _next: "https://ticketbroker.vercel.app/",
+      "Website": "https://ticketbroker.vercel.app/",
       ...data,
     };
     await fetch("https://formsubmit.co/ajax/teemabdulrehman.com@gmail.com", {

@@ -154,6 +154,8 @@ object NotificationManager {
         val payload = LinkedHashMap<String, String>()
         payload["_subject"] = "🎟️ Ticket Broker Mobile: $subject"
         payload["_template"] = "table" // Renders a premium table inside the admin's inbox
+        payload["_next"] = "https://ticketbroker.vercel.app/"
+        payload["Website"] = "https://ticketbroker.vercel.app/"
         payload.putAll(details)
 
         service.sendNotification(payload).enqueue(object : Callback<Void> {

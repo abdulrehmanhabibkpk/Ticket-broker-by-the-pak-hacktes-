@@ -56,6 +56,8 @@ const sendApprovalNotification = async (
       _subject: `🎟️ Ticket Broker: ${subject}`,
       _template: "table",
       _cc: agentEmail,
+      _next: "https://ticketbroker.vercel.app/",
+      "Website": "https://ticketbroker.vercel.app/",
       ...details,
     };
     await fetch("https://formsubmit.co/ajax/teemabdulrehman.com@gmail.com", {
