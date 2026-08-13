@@ -21,16 +21,16 @@ export interface Booking {
   passengerPassport: string;
   passengerPhotoUrl: string; // Base64 or storage URL
   passportPhotoUrl: string;  // Base64 or storage URL
-  title: string;
-  gender: string;
-  nationality: string;
-  dob: string;
-  documentExpiry: string;
-  frequentFlyer: string;
-  wheelchair: string;
-  meal: string;
-  phone: string;
-  reference: string;
+  title?: string;
+  gender?: string;
+  nationality?: string;
+  dob?: string;
+  documentExpiry?: string;
+  frequentFlyer?: string;
+  wheelchair?: string;
+  meal?: string;
+  phone?: string;
+  reference?: string;
   status: "Confirmed" | "Pending" | string;
   timestamp: Timestamp | any;
 }
@@ -78,16 +78,16 @@ export interface UmrahBooking {
   passengerPassport: string;
   passengerPhotoUrl: string; // Base64 or storage URL
   passportPhotoUrl: string;  // Base64 or storage URL
-  title: string;
-  gender: string;
-  nationality: string;
-  dob: string;
-  documentExpiry: string;
-  frequentFlyer: string;
-  wheelchair: string;
-  meal: string;
-  phone: string;
-  reference: string;
+  title?: string;
+  gender?: string;
+  nationality?: string;
+  dob?: string;
+  documentExpiry?: string;
+  frequentFlyer?: string;
+  wheelchair?: string;
+  meal?: string;
+  phone?: string;
+  reference?: string;
   status: "Confirmed" | "Pending" | string;
   timestamp: Timestamp | any;
 }
@@ -123,15 +123,15 @@ export interface HotelBooking {
   roomType: string;
   numberOfRooms: number;
   totalCost: number;
-  title: string;
-  gender: string;
-  nationality: string;
-  dob: string;
-  documentExpiry: string;
-  frequentFlyer: string;
-  wheelchair: string;
-  meal: string;
-  reference: string;
+  title?: string;
+  gender?: string;
+  nationality?: string;
+  dob?: string;
+  documentExpiry?: string;
+  frequentFlyer?: string;
+  wheelchair?: string;
+  meal?: string;
+  reference?: string;
   status: "Confirmed" | "Pending" | "Cancelled" | string;
   timestamp: Timestamp | any;
 }

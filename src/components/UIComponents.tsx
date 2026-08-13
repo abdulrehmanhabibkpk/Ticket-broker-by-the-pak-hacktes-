@@ -48,6 +48,7 @@ export function Input({
   onChange,
   placeholder,
   required = false,
+  name,
   min,
   max,
   step,
@@ -61,6 +62,7 @@ export function Input({
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder?: string;
   required?: boolean;
+  name?: string;
   min?: string | number;
   max?: string | number;
   step?: string | number;
@@ -76,6 +78,7 @@ export function Input({
       )}
       <input
         id={id}
+        name={name}
         type={type}
         value={value}
         onChange={onChange}

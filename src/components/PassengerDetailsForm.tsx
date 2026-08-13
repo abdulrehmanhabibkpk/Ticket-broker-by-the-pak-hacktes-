@@ -17,6 +17,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Title"
         name="title"
+        id="title"
         value={details.title || ""}
         onChange={handleChange}
         disabled={disabled}
@@ -25,6 +26,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="First Name"
         name="firstName"
+        id="firstName"
         value={details.firstName || ""}
         onChange={handleChange}
         disabled={disabled}
@@ -33,6 +35,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Last Name"
         name="lastName"
+        id="lastName"
         value={details.lastName || ""}
         onChange={handleChange}
         disabled={disabled}
@@ -41,6 +44,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Gender"
         name="gender"
+        id="gender"
         value={details.gender || ""}
         onChange={handleChange}
         disabled={disabled}
@@ -49,6 +53,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Nationality"
         name="nationality"
+        id="nationality"
         value={details.nationality || ""}
         onChange={handleChange}
         disabled={disabled}
@@ -57,6 +62,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Date of Birth"
         name="dob"
+        id="dob"
         type="date"
         value={details.dob || ""}
         onChange={handleChange}
@@ -66,6 +72,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Passport/NIC No."
         name="passportNo"
+        id="passportNo"
         value={details.passportNo || ""}
         onChange={handleChange}
         disabled={disabled}
@@ -74,6 +81,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Document Expiry"
         name="documentExpiry"
+        id="documentExpiry"
         type="date"
         value={details.documentExpiry || ""}
         onChange={handleChange}
@@ -83,6 +91,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Frequent Flyer"
         name="frequentFlyer"
+        id="frequentFlyer"
         value={details.frequentFlyer || ""}
         onChange={handleChange}
         disabled={disabled}
@@ -90,6 +99,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Wheelchair"
         name="wheelchair"
+        id="wheelchair"
         value={details.wheelchair || ""}
         onChange={handleChange}
         disabled={disabled}
@@ -97,6 +107,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Meal"
         name="meal"
+        id="meal"
         value={details.meal || ""}
         onChange={handleChange}
         disabled={disabled}
@@ -104,6 +115,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Phone"
         name="phone"
+        id="phone"
         value={details.phone || ""}
         onChange={handleChange}
         disabled={disabled}
@@ -112,6 +124,7 @@ export const PassengerDetailsForm: React.FC<PassengerDetailsFormProps> = ({ deta
       <Input
         label="Reference"
         name="reference"
+        id="reference"
         value={details.reference || ""}
         onChange={handleChange}
         disabled={disabled}
