@@ -18,6 +18,7 @@ import { Button, Input, Card, Badge, LoadingSpinner, Alert, Skeleton, TableSkele
 import { TicketInvoiceModal } from "./TicketInvoiceModal";
 import { HotelVoucherModal } from "./HotelVoucherModal";
 import { UmrahPackageInvoiceModal } from "./UmrahPackageInvoiceModal";
+import { PassengerDetailsForm } from "./PassengerDetailsForm";
 import {
   Plane,
   Plus,
@@ -180,6 +181,7 @@ export default function AgentDashboard({
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [passengerName, setPassengerName] = useState("");
   const [passengerPassport, setPassengerPassport] = useState("");
+  const [passengerDetails, setPassengerDetails] = useState<any>({});
   
   // File uploads
   const [passengerPhoto, setPassengerPhoto] = useState<string>("");
@@ -586,6 +588,16 @@ export default function AgentDashboard({
         passengerPassport: passengerPassport,
         passengerPhotoUrl: passengerPhoto,
         passportPhotoUrl: passportPhoto,
+        title: passengerDetails.title || "",
+        gender: passengerDetails.gender || "",
+        nationality: passengerDetails.nationality || "",
+        dob: passengerDetails.dob || "",
+        documentExpiry: passengerDetails.documentExpiry || "",
+        frequentFlyer: passengerDetails.frequentFlyer || "",
+        wheelchair: passengerDetails.wheelchair || "",
+        meal: passengerDetails.meal || "",
+        phone: passengerDetails.phone || "",
+        reference: passengerDetails.reference || "",
         status: "Pending",
         timestamp: new Date()
       };
@@ -615,6 +627,16 @@ export default function AgentDashboard({
         "Agent Email": agentEmail,
         "Passenger Name": passengerName,
         "Passenger Passport": passengerPassport,
+        "Title": passengerDetails.title || "N/A",
+        "Gender": passengerDetails.gender || "N/A",
+        "Nationality": passengerDetails.nationality || "N/A",
+        "Date of Birth": passengerDetails.dob || "N/A",
+        "Document Expiry": passengerDetails.documentExpiry || "N/A",
+        "Frequent Flyer": passengerDetails.frequentFlyer || "N/A",
+        "Wheelchair": passengerDetails.wheelchair || "N/A",
+        "Meal": passengerDetails.meal || "N/A",
+        "Phone": passengerDetails.phone || "N/A",
+        "Reference": passengerDetails.reference || "N/A",
         "Flight Route": `${selectedTicket.origin} ➔ ${selectedTicket.destination}`,
         "Airline": selectedTicket.airline,
         "Ticket Price": `PKR ${selectedTicket.price.toLocaleString()}`,
@@ -1594,6 +1616,12 @@ export default function AgentDashboard({
                           value={passengerPassport}
                           onChange={(e) => setPassengerPassport(e.target.value)}
                           required
+                          disabled={bookingLoading}
+                        />
+
+                        <PassengerDetailsForm
+                          details={passengerDetails}
+                          setDetails={setPassengerDetails}
                           disabled={bookingLoading}
                         />
 
